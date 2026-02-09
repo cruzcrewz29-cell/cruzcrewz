@@ -1,0 +1,18 @@
+:root {
+	/* Colors */
+	--color-bg: 248 250 252;        /* slate-50 */
+	--color-surface: 255 255 255;   /* white */
+	--color-border: 226 232 240;    /* slate-200 */
+	--color-text: 15 23 42;         /* slate-900 */
+	--color-muted: 100 116 139;     /* slate-500 */
+	--color-primary: 15 23 42;      /* slate-900 */
+
+	/* Radius */
+	--radius-sm: 6px;
+	--radius-md: 10px;
+	--radius-lg: 14px;
+
+	/* Spacing (semantic) */
+	--space-page: 24px;
+	--space-section: 16px;
+}
