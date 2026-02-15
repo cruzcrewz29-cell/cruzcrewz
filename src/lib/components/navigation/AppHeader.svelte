@@ -12,6 +12,7 @@
   const navItems = [
     { id: 'home', label: 'Home', href: '/' },
     { id: 'services', label: 'Services', href: '/services' },
+    { id: 'portfolio', label: 'Portfolio', href: '/portfolio' },
     { id: 'quote', label: 'Get Quote', href: '/quote' },
     { id: 'app', label: 'Dashboard', href: '/app' },
   ];
@@ -27,7 +28,7 @@
         
         <nav class="hidden md:flex md:gap-6">
           {#each navItems as item}
-            <a
+            
               href={item.href}
               class="text-sm font-medium transition-colors hover:text-gray-900"
               class:text-gray-900={activeSection === item.id}

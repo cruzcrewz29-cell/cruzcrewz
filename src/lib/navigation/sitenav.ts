@@ -2,6 +2,8 @@ import LayoutDashboard from 'lucide-svelte/icons/layout-dashboard';
 import ClipboardList from 'lucide-svelte/icons/clipboard-list';
 import Users from 'lucide-svelte/icons/users';
 import Settings from 'lucide-svelte/icons/settings';
+import ImageIcon from 'lucide-svelte/icons/image';
+import MessageSquare from 'lucide-svelte/icons/message-square';
 
 export type NavItem = {
 	label: string;
@@ -28,6 +30,18 @@ export const SITE_NAV: NavItem[] = [
 		href: '/app/customers',
 		section: 'Customers',
 		icon: Users
+	},
+	{
+		label: 'Portfolio',
+		href: '/app/portfolio',
+		section: 'Portfolio',
+		icon: ImageIcon
+	},
+	{
+		label: 'Testimonials',
+		href: '/app/testimonials',
+		section: 'Testimonials',
+		icon: MessageSquare
 	},
 	{
 		label: 'Settings',
