@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { portfolioStore, type PortfolioItem } from '$lib/data/portfolio';
   import { services } from '$lib/data/services';
   
@@ -116,11 +116,11 @@
           <div class="grid grid-cols-2 gap-2 p-2">
             <div class="relative">
               <div class="absolute left-2 top-2 rounded bg-red-500 px-2 py-1 text-xs font-bold text-white">BEFORE</div>
-              <img src={item.beforeImage} alt="Before" class="h-32 w-full rounded object-cover" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22128%22%3E%3Crect fill=%22%23ddd%22 width=%22200%22 height=%22128%22/%3E%3Ctext fill=%22%23999%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22%3EBefore%3C/text%3E%3C/svg%3E'" />
+              <img src={item.beforeImage} alt="Before" class="h-32 w-full rounded object-cover" />
             </div>
             <div class="relative">
               <div class="absolute left-2 top-2 rounded bg-green-500 px-2 py-1 text-xs font-bold text-white">AFTER</div>
-              <img src={item.afterImage} alt="After" class="h-32 w-full rounded object-cover" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22128%22%3E%3Crect fill=%22%23ddd%22 width=%22200%22 height=%22128%22/%3E%3Ctext fill=%22%23999%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22%3EAfter%3C/text%3E%3C/svg%3E'" />
+              <img src={item.afterImage} alt="After" class="h-32 w-full rounded object-cover" />
             </div>
           </div>
           
@@ -150,7 +150,7 @@
             <div class="mt-4 flex items-center gap-2">
               <button
                 onclick={() => toggleFeatured(item.id, item.featured)}
-                class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
                 title={item.featured ? 'Remove from featured' : 'Mark as featured'}
               >
                 <svg class="mx-auto h-4 w-4" fill={item.featured ? 'currentColor' : 'none'} viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5">
@@ -159,13 +159,13 @@
               </button>
               <button
                 onclick={() => openEditModal(item)}
-                class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                class="flex-1 rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-200"
               >
                 Edit
               </button>
               <button
                 onclick={() => deleteItem(item.id)}
-                class="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
+                class="rounded-lg bg-red-100 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-200"
               >
                 Delete
               </button>

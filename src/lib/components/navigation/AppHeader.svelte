@@ -28,7 +28,7 @@
         
         <nav class="hidden md:flex md:gap-6">
           {#each navItems as item}
-            
+            <a
               href={item.href}
               class="text-sm font-medium transition-colors hover:text-gray-900"
               class:text-gray-900={activeSection === item.id}

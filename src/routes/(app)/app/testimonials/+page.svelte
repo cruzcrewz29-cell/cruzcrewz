@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { testimonialsStore, type Testimonial } from '$lib/data/portfolio';
   import { services } from '$lib/data/services';
   
@@ -150,7 +150,7 @@
             <div class="ml-4 flex flex-col gap-2">
               <button
                 onclick={() => toggleFeatured(testimonial.id, testimonial.featured)}
-                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
                 title={testimonial.featured ? 'Remove from featured' : 'Mark as featured'}
               >
                 <svg class="h-4 w-4" fill={testimonial.featured ? 'currentColor' : 'none'} viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5">
@@ -158,14 +158,14 @@
                 </svg>
               </button>
               <button
-                onclick={() => openEditModal(testimonial)}
-                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                onclick={() => openEditModal(testimonial)}>
+                class="rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-200"
               >
                 Edit
               </button>
               <button
                 onclick={() => deleteTestimonial(testimonial.id)}
-                class="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
+                class="rounded-lg bg-red-100 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-200"
               >
                 Delete
               </button>
@@ -181,14 +181,16 @@
 {#if showModal}
   <div class="fixed inset-0 z-50 overflow-y-auto">
     <div class="flex min-h-screen items-center justify-center p-4">
-      <div class="fixed inset-0 bg-gray-900/50 transition-opacity" onclick={closeModal}></div>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
+      <div class="fixed inset-0 bg-gray-900/50 transition-opacity" onclick={closeModal} role="button" tabindex="-1"></div>
       
       <div class="relative w-full max-w-2xl rounded-lg bg-white shadow-xl">
         <div class="flex items-center justify-between border-b p-6">
           <h2 class="text-xl font-semibold text-gray-900">
             {editingTestimonial ? 'Edit Testimonial' : 'Add New Testimonial'}
           </h2>
-          <button onclick={closeModal} class="text-gray-400 hover:text-gray-600">
+          <button onclick={closeModal} class="text-gray-400 hover:text-gray-600" aria-label="Close modal">
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -199,8 +201,9 @@
           <div class="space-y-4">
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
-                <label class="block text-sm font-medium text-gray-700">Customer Name</label>
+                <label for="customer-name" class="block text-sm font-medium text-gray-700">Customer Name</label>
                 <input
+                  id="customer-name"
                   type="text"
                   bind:value={formData.name}
                   required
@@ -210,8 +213,9 @@
               </div>
               
               <div>
-                <label class="block text-sm font-medium text-gray-700">Location</label>
+                <label for="location" class="block text-sm font-medium text-gray-700">Location</label>
                 <input
+                  id="location"
                   type="text"
                   bind:value={formData.location}
                   required
@@ -222,8 +226,9 @@
             </div>
             
             <div>
-              <label class="block text-sm font-medium text-gray-700">Testimonial</label>
+              <label for="testimonial-text" class="block text-sm font-medium text-gray-700">Testimonial</label>
               <textarea
+                id="testimonial-text"
                 bind:value={formData.text}
                 required
                 rows="4"
@@ -234,8 +239,9 @@
             
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
-                <label class="block text-sm font-medium text-gray-700">Rating</label>
+                <label for="rating" class="block text-sm font-medium text-gray-700">Rating</label>
                 <select
+                  id="rating"
                   bind:value={formData.rating}
                   required
                   class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-green-500"
@@ -249,13 +255,14 @@
               </div>
               
               <div>
-                <label class="block text-sm font-medium text-gray-700">Service (Optional)</label>
+                <label for="service" class="block text-sm font-medium text-gray-700">Service (Optional)</label>
                 <select
+                  id="service"
                   bind:value={formData.service}
                   class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-green-500"
                 >
                   <option value="">Not specified</option>
-                  {#each services as service}
+                {#each Array(Number(testimonial.rating)) as _}
                     <option value={service.name}>{service.name}</option>
                   {/each}
                 </select>
@@ -263,8 +270,9 @@
             </div>
             
             <div>
-              <label class="block text-sm font-medium text-gray-700">Date</label>
+              <label for="date" class="block text-sm font-medium text-gray-700">Date</label>
               <input
+                id="date"
                 type="date"
                 bind:value={formData.date}
                 required
