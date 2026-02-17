@@ -1,7 +1,20 @@
 <script>
-  // src/routes/(public)/quote/+page.svelte
   import { page } from '$app/stores';
+  import { supabase } from '$lib/supabase';
   import { services, serviceAreas } from '$lib/data/services';
+  import ContractAgreement from '$lib/components/ContractAgreement.svelte';
+  
+  // ZIP to State mapping
+  const zipToState = {
+    '46': 'IN', // Indiana
+    '60': 'IL', // Illinois (Chicago area)
+  };
+  
+  function getStateFromZip(zip) {
+    if (!zip || zip.length < 2) return '';
+    const prefix = zip.substring(0, 2);
+    return zipToState[prefix] || '';
+  }
   
   // Form state
   let currentStep = $state(1);
@@ -13,7 +26,7 @@
     // Step 2: Property Details
     address: '',
     city: '',
-    state: 'GA',
+    state: '',
     zipCode: '',
     
     // Step 3: Contact Info
@@ -31,6 +44,20 @@
   let errors = $state({});
   let isValidZip = $state(true);
   let estimatedPrice = $state(null);
+  let showContract = $state(false);
+  let showQuoteOptions = $state(false);
+  let contractData = $state(null);
+  let submitting = $state(false);
+  
+  // Auto-detect state from ZIP code
+  $effect(() => {
+    if (formData.zipCode.length >= 2) {
+      const detectedState = getStateFromZip(formData.zipCode);
+      if (detectedState) {
+        formData.state = detectedState;
+      }
+    }
+  });
   
   // Pre-select service from URL query param
   $effect(() => {
@@ -104,11 +131,111 @@
   async function submitQuote() {
     if (!validateStep(4)) return;
     
-    // TODO: Submit to backend
-    console.log('Quote Request:', formData);
+    submitting = true;
     
-    // For now, show success
-    alert('Quote request submitted! We\'ll contact you within 24 hours.');
+    try {
+      // Create or find customer
+      const fullAddress = `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`;
+      
+      let customerId;
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', formData.email)
+        .single();
+      
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+      } else {
+        const { data: newCustomer, error: customerError } = await supabase
+          .from('customers')
+          .insert({
+            name: `${formData.firstName} ${formData.lastName}`,
+            email: formData.email,
+            phone: formData.phone,
+            address: fullAddress
+          })
+          .select()
+          .single();
+        
+        if (customerError) throw customerError;
+        customerId = newCustomer.id;
+      }
+      
+      // Create job with pending status
+      const { data: job, error: jobError } = await supabase
+        .from('jobs')
+        .insert({
+          customer_id: customerId,
+          service_type: selectedServiceData.name,
+          description: formData.additionalNotes || '',
+          status: 'pending',
+          scheduled_date: formData.startDate || new Date().toISOString(),
+          price: estimatedPrice,
+          customer_phone: formData.phone
+        })
+        .select()
+        .single();
+      
+      if (jobError) throw jobError;
+      
+      // Prepare contract data
+      contractData = {
+        jobId: job.id,
+        customerId: customerId,
+        customerName: `${formData.firstName} ${formData.lastName}`,
+        customerEmail: formData.email,
+        customerPhone: formData.phone,
+        services: [selectedServiceData.name],
+        schedule: `${formData.frequency} service starting ${formData.startDate || 'as soon as possible'}`,
+        totalPrice: estimatedPrice || 0
+      };
+      
+      // Show options modal
+      showQuoteOptions = true;
+      
+    } catch (error) {
+      console.error('Quote submission error:', error);
+      alert('Failed to submit quote. Please try again.');
+    } finally {
+      submitting = false;
+    }
+  }
+  
+  function handleSignNow() {
+    showQuoteOptions = false;
+    showContract = true;
+  }
+  
+  async function handleSignLater() {
+    // Send quote email with link to sign later
+    await fetch('/api/send-quote-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerEmail: contractData.customerEmail,
+        customerName: contractData.customerName,
+        services: contractData.services,
+        schedule: contractData.schedule,
+        totalPrice: contractData.totalPrice,
+        jobId: contractData.jobId
+      })
+    });
+    
+    showQuoteOptions = false;
+    alert('Quote saved! We\'ve sent you an email with a link to sign the contract when you\'re ready.');
+    window.location.href = '/';
+  }
+  
+  function handleContractComplete() {
+    showContract = false;
+    alert('Thank you! Your service agreement has been signed. We\'ll contact you shortly to confirm your first appointment.');
+    window.location.href = '/';
+  }
+  
+  function handleContractCancel() {
+    showContract = false;
+    showQuoteOptions = true;
   }
 </script>
 
@@ -118,37 +245,38 @@
 
 <div class="min-h-screen bg-gray-50 py-12">
   <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+
     <!-- Progress Bar -->
     <div class="mb-8">
       <div class="flex items-center justify-between">
         {#each [1, 2, 3, 4] as step}
-          <div class="flex flex-1 items-center">
-            <div
-              class="flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors"
-              class:border-green-600={currentStep >= step}
-              class:bg-green-600={currentStep >= step}
-              class:text-white={currentStep >= step}
-              class:border-gray-300={currentStep < step}
-              class:bg-white={currentStep < step}
-              class:text-gray-400={currentStep < step}
-            >
-              {step}
-            </div>
-            {#if step < 4}
+          <div class="flex items-center {step !== 4 ? 'flex-1' : ''}">
+            
+            <div class="flex flex-col items-center text-center">
               <div
-                class="h-1 flex-1 transition-colors"
-                class:bg-green-600={currentStep > step}
-                class:bg-gray-300={currentStep <= step}
-              />
+                class="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold
+                  {currentStep >= step
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-200 text-gray-600'}"
+              >
+                {step}
+              </div>
+              <span class="mt-2 text-xs font-medium text-gray-600">
+                {step === 1 && 'Service'}
+                {step === 2 && 'Property'}
+                {step === 3 && 'Contact'}
+                {step === 4 && 'Details'}
+              </span>
+            </div>
+
+            {#if step !== 4}
+              <div
+                class="mx-4 h-1 flex-1 rounded
+                  {currentStep > step ? 'bg-green-600' : 'bg-gray-200'}"
+              ></div>
             {/if}
           </div>
         {/each}
-      </div>
-      <div class="mt-2 flex justify-between text-xs text-gray-600">
-        <span>Service</span>
-        <span>Property</span>
-        <span>Contact</span>
-        <span>Details</span>
       </div>
     </div>
 
@@ -164,8 +292,9 @@
         {#if currentStep === 1}
           <div class="space-y-6">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Select Service</label>
+              <label for="service-select" class="block text-sm font-medium text-gray-700">Select Service</label>
               <select
+                id="service-select"
                 bind:value={formData.selectedService}
                 class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
                 class:border-red-500={errors.selectedService}
@@ -187,10 +316,7 @@
                   <button
                     type="button"
                     onclick={() => formData.propertySize = size}
-                    class="rounded-lg border-2 p-4 text-center transition-all"
-                    class:border-green-600={formData.propertySize === size}
-                    class:bg-green-50={formData.propertySize === size}
-                    class:border-gray-300={formData.propertySize !== size}
+                    class="rounded-lg border-2 p-4 text-center transition-all {formData.propertySize === size ? 'border-green-600 bg-green-50' : 'border-gray-300'}"
                   >
                     <div class="text-sm font-semibold capitalize text-gray-900">{size}</div>
                     <div class="mt-1 text-xs text-gray-600">
@@ -243,7 +369,7 @@
                   bind:value={formData.city}
                   class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
                   class:border-red-500={errors.city}
-                  placeholder="Atlanta"
+                  placeholder="Chicago"
                 />
                 {#if errors.city}
                   <p class="mt-1 text-sm text-red-600">{errors.city}</p>
@@ -251,36 +377,25 @@
               </div>
 
               <div>
-                <label for="state" class="block text-sm font-medium text-gray-700">State</label>
-                <select
-                  id="state"
-                  bind:value={formData.state}
+                <label for="zipCode" class="block text-sm font-medium text-gray-700">ZIP Code</label>
+                <input
+                  type="text"
+                  id="zipCode"
+                  bind:value={formData.zipCode}
+                  onblur={validateZipCode}
+                  maxlength="5"
                   class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                >
-                  <option value="GA">Georgia</option>
-                </select>
+                  class:border-red-500={errors.zipCode || !isValidZip}
+                  placeholder="60601"
+                />
+                {#if errors.zipCode}
+                  <p class="mt-1 text-sm text-red-600">{errors.zipCode}</p>
+                {:else if formData.zipCode && !isValidZip}
+                  <p class="mt-1 text-sm text-red-600">We don't currently service this area. Enter your email to be notified when we do!</p>
+                {:else if formData.zipCode && isValidZip}
+                  <p class="mt-1 text-sm text-green-600">✓ We service your area!{formData.state ? ` (${formData.state})` : ''}</p>
+                {/if}
               </div>
-            </div>
-
-            <div>
-              <label for="zipCode" class="block text-sm font-medium text-gray-700">ZIP Code</label>
-              <input
-                type="text"
-                id="zipCode"
-                bind:value={formData.zipCode}
-                onblur={validateZipCode}
-                maxlength="5"
-                class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                class:border-red-500={errors.zipCode || !isValidZip}
-                placeholder="30301"
-              />
-              {#if errors.zipCode}
-                <p class="mt-1 text-sm text-red-600">{errors.zipCode}</p>
-              {:else if formData.zipCode && !isValidZip}
-                <p class="mt-1 text-sm text-red-600">We don't currently service this area. Enter your email to be notified when we do!</p>
-              {:else if formData.zipCode && isValidZip}
-                <p class="mt-1 text-sm text-green-600">✓ We service your area!</p>
-              {/if}
             </div>
           </div>
         {/if}
@@ -360,10 +475,7 @@
                   <button
                     type="button"
                     onclick={() => formData.frequency = freq.value}
-                    class="rounded-lg border-2 p-3 text-center transition-all"
-                    class:border-green-600={formData.frequency === freq.value}
-                    class:bg-green-50={formData.frequency === freq.value}
-                    class:border-gray-300={formData.frequency !== freq.value}
+                    class="rounded-lg border-2 p-3 text-center transition-all {formData.frequency === freq.value ? 'border-green-600 bg-green-50' : 'border-gray-300'}"
                   >
                     <div class="text-sm font-semibold text-gray-900">{freq.label}</div>
                   </button>
@@ -389,7 +501,7 @@
                 rows="4"
                 class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
                 placeholder="Any specific concerns, gate codes, or special instructions..."
-              />
+              ></textarea>
             </div>
 
             <!-- Summary -->
@@ -445,9 +557,10 @@
             <button
               type="button"
               onclick={submitQuote}
-              class="rounded-lg bg-green-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
+              disabled={submitting}
+              class="rounded-lg bg-green-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Submit Quote Request
+              {submitting ? 'Processing...' : 'Get Quote'}
             </button>
           {/if}
         </div>
@@ -461,3 +574,56 @@
     </div>
   </div>
 </div>
+
+<!-- Quote Options Modal -->
+{#if showQuoteOptions && contractData}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Quote Ready!</h2>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div class="text-center">
+          <div class="text-4xl font-bold text-green-600 mb-2">
+            ${contractData.totalPrice.toFixed(2)}
+          </div>
+          <p class="text-sm text-gray-600">Estimated price for your service</p>
+        </div>
+
+        <div class="bg-gray-50 rounded-lg p-4 text-sm">
+          <p><strong>Service:</strong> {contractData.services[0]}</p>
+          <p class="mt-1"><strong>Schedule:</strong> {contractData.schedule}</p>
+        </div>
+
+        <p class="text-sm text-gray-600 text-center">
+          Would you like to sign the service agreement now or receive a link via email to sign later?
+        </p>
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-200 space-y-3">
+        <button
+          onclick={handleSignNow}
+          class="w-full px-4 py-3 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700"
+        >
+          Sign Agreement Now
+        </button>
+        <button
+          onclick={handleSignLater}
+          class="w-full px-4 py-3 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+        >
+          Email Me a Link to Sign Later
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Contract Modal -->
+{#if showContract && contractData}
+  <ContractAgreement 
+    {contractData}
+    onComplete={handleContractComplete}
+    onCancel={handleContractCancel}
+  />
+{/if}

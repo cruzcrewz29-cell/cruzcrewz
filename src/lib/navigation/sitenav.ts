@@ -1,4 +1,5 @@
 import LayoutDashboard from 'lucide-svelte/icons/layout-dashboard';
+import Calendar from 'lucide-svelte/icons/calendar';
 import ClipboardList from 'lucide-svelte/icons/clipboard-list';
 import Users from 'lucide-svelte/icons/users';
 import Settings from 'lucide-svelte/icons/settings';
@@ -18,6 +19,12 @@ export const SITE_NAV: NavItem[] = [
 		href: '/app',
 		section: 'Dashboard',
 		icon: LayoutDashboard
+	},
+	{
+		label: 'Calendar',
+		href: '/app/calendar',
+		section: 'Calendar',
+		icon: Calendar
 	},
 	{
 		label: 'Jobs',

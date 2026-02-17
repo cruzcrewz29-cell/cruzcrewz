@@ -1,58 +1,48 @@
 <script>
-  // src/routes/(public)/+page.svelte
+  import { onMount } from 'svelte';
+  import { supabase } from '$lib/supabase';
   import ServiceAreaChecker from '$lib/components/ServiceAreaChecker.svelte';
   
   const stats = [
-    { label: 'Happy Customers', value: '2,500+' },
-    { label: 'Lawns Serviced', value: '50,000+' },
+    { label: 'Happy Customers', value: '5,000+' },
+    { label: 'Lawns Serviced', value: '100,000+' },
     { label: 'Years Experience', value: '15+' },
     { label: 'Service Areas', value: '40+' }
   ];
   
   const topServices = [
-    {
-      name: 'Lawn Mowing',
-      description: 'Weekly or bi-weekly professional mowing service',
-      price: 'From $60',
-      icon: '🌱',
-      href: '/quote?service=lawn-mowing'
-    },
-    {
-      name: 'Fertilization',
-      description: 'Professional-grade lawn treatment programs',
-      price: 'From $95',
-      icon: '🌿',
-      href: '/quote?service=fertilization-weed-control'
-    },
-    {
-      name: 'Landscape Care',
-      description: 'Complete landscape maintenance and design',
-      price: 'From $195',
-      icon: '🌳',
-      href: '/quote?service=landscape-maintenance'
-    }
-  ];
+  {
+    name: 'Lawn Mowing',
+    description: 'Weekly or bi-weekly professional mowing service',
+    price: 'From $60',
+    href: '/quote?service=lawn-mowing'
+  },
+  {
+    name: 'Fertilization',
+    description: 'Professional-grade lawn treatment programs',
+    price: 'From $95',
+    href: '/quote?service=fertilization-weed-control'
+  },
+  {
+    name: 'Landscape Care',
+    description: 'Complete landscape maintenance and design',
+    price: 'From $195',
+    href: '/quote?service=landscape-maintenance'
+  }
+];
   
-  const testimonials = [
-    {
-      name: 'Sarah Johnson',
-      location: 'Buckhead, GA',
-      text: 'Best lawn service we\'ve ever used! Our yard has never looked better and the team is always on time.',
-      rating: 5
-    },
-    {
-      name: 'Michael Chen',
-      location: 'Midtown, GA',
-      text: 'Professional, reliable, and affordable. They transformed our overgrown yard into something we\'re proud of.',
-      rating: 5
-    },
-    {
-      name: 'Jennifer Williams',
-      location: 'Decatur, GA',
-      text: 'Great communication and attention to detail. They even clean up after themselves - highly recommend!',
-      rating: 5
-    }
-  ];
+  let testimonials = $state([]);
+  
+  onMount(async () => {
+    const { data } = await supabase
+      .from('testimonials')
+      .select('*')
+      .eq('featured', true)
+      .order('date', { ascending: false })
+      .limit(3);
+    
+    testimonials = data || [];
+  });
 </script>
 
 <svelte:head>
@@ -157,9 +147,23 @@
     </div>
     
     <div class="mt-16 grid gap-8 md:grid-cols-3">
-      {#each topServices as service}
+      {#each topServices as service, index}
         <div class="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-sm transition-all hover:shadow-xl">
-          <div class="text-5xl mb-4">{service.icon}</div>
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+            {#if index === 0}
+              <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+              </svg>
+            {:else if index === 1}
+              <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+              </svg>
+            {:else}
+              <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+              </svg>
+            {/if}
+          </div>
           <h3 class="text-xl font-bold text-gray-900">{service.name}</h3>
           <p class="mt-2 text-gray-600">{service.description}</p>
           <div class="mt-4 flex items-baseline justify-between">

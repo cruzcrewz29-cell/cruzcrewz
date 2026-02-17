@@ -1,6 +1,6 @@
 <script>
-  // src/routes/(public)/services/+page.svelte
   import { services } from '$lib/data/services';
+  import ServiceIcon from '$lib/components/ServiceIcon.svelte';
   
   let selectedFrequency = $state('all');
   
@@ -94,7 +94,9 @@
           <!-- Service Header -->
           <div class="border-b bg-gradient-to-r from-green-50 to-green-100 p-6">
             <div class="flex items-center gap-3">
-              <span class="text-4xl">{service.icon}</span>
+              <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white">
+                <ServiceIcon name={service.icon} class="h-6 w-6 text-green-600" />
+              </div>
               <div>
                 <h3 class="text-xl font-bold text-gray-900">{service.name}</h3>
                 <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 capitalize">
