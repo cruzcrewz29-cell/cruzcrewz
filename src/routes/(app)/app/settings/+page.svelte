@@ -83,13 +83,6 @@
 		}
 	}
 
-	async function uploadFile(e: Event) {
-		const input = e.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-
-		uploading = true;
-
 		try {
 			const ext = file.name.split('.').pop();
 			const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
