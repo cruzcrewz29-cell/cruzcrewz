@@ -83,7 +83,7 @@
 		}
 	}
 
-		try {
+				try {
 			const ext = file.name.split('.').pop();
 			const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
@@ -101,7 +101,6 @@
 		} finally {
 			uploading = false;
 		}
-	}
 
 	async function deleteAsset(filename: string) {
 		if (!confirm(`Delete ${filename}?`)) return;
