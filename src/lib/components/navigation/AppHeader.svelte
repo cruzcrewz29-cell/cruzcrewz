@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth.svelte';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
   
   let { actions } = $props();
   
@@ -29,8 +30,8 @@
     <div class="flex h-16 items-center justify-between">
       
       <div class="flex items-center gap-8">
-        <a href="/" class="text-xl font-bold text-gray-900">
-          Cruz Crewz
+        <a href="/" class="flex items-center">
+          <BrandLogo size="sm" />
         </a>
         
         <nav class="hidden md:flex md:gap-6">
@@ -61,7 +62,7 @@
             </a>
 
             <button
-              on:click={handleLogout}
+              onclick={handleLogout}
               class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Logout

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabase';
+  import { siteConfig } from '$lib/config/site';
 
   let portfolioItems = $state([]);
   let loading = $state(true);
@@ -21,8 +22,18 @@
 </svelte:head>
 
 <!-- Hero Section -->
-<section class="bg-gradient-to-br from-green-600 to-green-800 py-20">
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+<section class="relative overflow-hidden bg-gray-900">
+  <!-- Background Image with Overlay -->
+  <div class="absolute inset-0">
+    <img 
+      src={siteConfig.images.portfolioHero} 
+      alt="Portfolio showcase" 
+      class="h-full w-full object-cover opacity-40"
+    />
+    <div class="absolute inset-0 bg-gradient-to-br from-green-900/80 via-green-800/70 to-green-700/60"></div>
+  </div>
+
+  <div class="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
     <div class="text-center">
       <h1 class="text-4xl font-bold tracking-tight text-white sm:text-5xl">
         Our Portfolio

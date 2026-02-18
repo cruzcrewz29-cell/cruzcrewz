@@ -1,6 +1,7 @@
 <script>
   import { services } from '$lib/data/services';
   import ServiceIcon from '$lib/components/ServiceIcon.svelte';
+  import { siteConfig } from '$lib/config/site';
   
   let selectedFrequency = $state('all');
   
@@ -17,25 +18,35 @@
 </svelte:head>
 
 <!-- Hero Section -->
-<section class="bg-gradient-to-b from-green-50 to-white py-16">
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+<section class="relative overflow-hidden bg-gray-900">
+  <!-- Background Image with Overlay -->
+  <div class="absolute inset-0">
+    <img 
+      src={siteConfig.images.servicesHero} 
+      alt="Professional lawn care services" 
+      class="h-full w-full object-cover opacity-40"
+    />
+    <div class="absolute inset-0 bg-gradient-to-br from-green-900/80 via-green-800/70 to-green-700/60"></div>
+  </div>
+
+  <div class="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
     <div class="text-center">
-      <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">
+      <h1 class="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
         Professional Lawn Care Services
       </h1>
-      <p class="mx-auto mt-4 max-w-2xl text-xl text-gray-600">
+      <p class="mx-auto mt-4 max-w-2xl text-xl text-green-100">
         From weekly mowing to seasonal treatments, we keep your lawn healthy and beautiful year-round.
       </p>
       <div class="mt-8 flex justify-center gap-4">
         <a
           href="/quote"
-          class="rounded-lg bg-green-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          class="rounded-lg bg-white px-8 py-3 text-base font-semibold text-green-700 shadow-lg hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-green-700"
         >
           Get Free Quote
         </a>
         <a
           href="#services"
-          class="rounded-lg border border-gray-300 bg-white px-8 py-3 text-base font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          class="rounded-lg border-2 border-white bg-transparent px-8 py-3 text-base font-semibold text-white hover:bg-white hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-green-700"
         >
           View Services
         </a>

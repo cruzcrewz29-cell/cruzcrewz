@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabase';
   import ServiceAreaChecker from '$lib/components/ServiceAreaChecker.svelte';
+  import ServiceIcon from '$lib/components/ServiceIcon.svelte';
+  import { siteConfig } from '$lib/config/site';
   
   const stats = [
     { label: 'Happy Customers', value: '5,000+' },
@@ -11,25 +13,25 @@
   ];
   
   const topServices = [
-  {
-    name: 'Lawn Mowing',
-    description: 'Weekly or bi-weekly professional mowing service',
-    price: 'From $60',
-    href: '/quote?service=lawn-mowing'
-  },
-  {
-    name: 'Fertilization',
-    description: 'Professional-grade lawn treatment programs',
-    price: 'From $95',
-    href: '/quote?service=fertilization-weed-control'
-  },
-  {
-    name: 'Landscape Care',
-    description: 'Complete landscape maintenance and design',
-    price: 'From $195',
-    href: '/quote?service=landscape-maintenance'
-  }
-];
+    {
+      name: 'Lawn Mowing',
+      description: 'Weekly or bi-weekly professional mowing service',
+      price: 'From $60',
+      href: '/quote?service=lawn-mowing'
+    },
+    {
+      name: 'Fertilization',
+      description: 'Professional-grade lawn treatment programs',
+      price: 'From $95',
+      href: '/quote?service=fertilization-weed-control'
+    },
+    {
+      name: 'Landscape Care',
+      description: 'Complete landscape maintenance and design',
+      price: 'From $195',
+      href: '/quote?service=landscape-maintenance'
+    }
+  ];
   
   let testimonials = $state([]);
   
@@ -51,8 +53,17 @@
 </svelte:head>
 
 <!-- Hero Section -->
-<section class="relative overflow-hidden bg-gradient-to-br from-green-600 via-green-700 to-green-800">
-  <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-40"></div>
+<section class="relative overflow-hidden bg-gray-900">
+  <!-- Background Image with Overlay -->
+  <div class="absolute inset-0">
+    <img 
+      src={siteConfig.images.homeHero} 
+      alt="Professional lawn care" 
+      class="h-full w-full object-cover opacity-40"
+    />
+    <div class="absolute inset-0 bg-gradient-to-br from-green-900/80 via-green-800/70 to-green-700/60"></div>
+    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-40"></div>
+  </div>
   
   <div class="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
     <div class="grid gap-12 lg:grid-cols-2 lg:gap-8">
@@ -101,7 +112,7 @@
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
             </svg>
-            <span class="text-sm font-medium">2,500+ Customers</span>
+            <span class="text-sm font-medium">5,000+ Customers</span>
           </div>
         </div>
       </div>

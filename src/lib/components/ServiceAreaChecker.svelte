@@ -42,7 +42,7 @@
             id="zipCode"
             bind:value={zipCode}
             maxlength="5"
-            placeholder="30301"
+            placeholder="60660"
             class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
             onkeydown={(e) => e.key === 'Enter' && checkServiceArea()}
           />
