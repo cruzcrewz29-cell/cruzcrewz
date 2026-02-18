@@ -83,25 +83,7 @@
 		}
 	}
 
-				try {
-			const ext = file.name.split('.').pop();
-			const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-
-			const { error } = await supabase.storage
-				.from('site-assets')
-				.upload(filename, file, { upsert: false });
-
-			if (error) throw error;
-
-			await loadAssets();
-			input.value = '';
-		} catch (error) {
-			console.error('Upload error:', error);
-			alert('Failed to upload file. Please try again.');
-		} finally {
-			uploading = false;
-		}
-
+			
 	async function deleteAsset(filename: string) {
 		if (!confirm(`Delete ${filename}?`)) return;
 
