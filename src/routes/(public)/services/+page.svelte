@@ -58,7 +58,7 @@
 <!-- Filter Section -->
 <section id="services" class="border-b bg-white py-8">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-    <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-col items-center gap-4">
       <h2 class="text-2xl font-bold text-gray-900">Our Services</h2>
       <div class="flex gap-2">
         <button
@@ -99,9 +99,10 @@
 <!-- Services Grid -->
 <section class="bg-gray-50 py-16">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-    <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+    <div class="flex flex-wrap justify-center gap-8">
       {#each filteredServices as service (service.id)}
-        <div class="flex flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-shadow hover:shadow-lg">
+        <div class="flex flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-shadow hover:shadow-lg w-full md:w-[calc(50%-1rem)] lg:w-[calc(33.333%-1.5rem)]">
+          <!-- Rest of the service card code stays the same -->
           <!-- Service Header -->
           <div class="border-b bg-gradient-to-r from-green-50 to-green-100 p-6">
             <div class="flex items-center gap-3">

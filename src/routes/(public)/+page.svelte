@@ -159,8 +159,8 @@
     
     <div class="mt-16 grid gap-8 md:grid-cols-3">
       {#each topServices as service, index}
-        <div class="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-sm transition-all hover:shadow-xl">
-          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+        <div class="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-sm transition-all hover:shadow-xl text-center">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 mx-auto">
             {#if index === 0}
               <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
@@ -177,12 +177,12 @@
           </div>
           <h3 class="text-xl font-bold text-gray-900">{service.name}</h3>
           <p class="mt-2 text-gray-600">{service.description}</p>
-          <div class="mt-4 flex items-baseline justify-between">
+          <div class="mt-4">
             <span class="text-2xl font-bold text-green-600">{service.price}</span>
           </div>
           <a
             href={service.href}
-            class="mt-6 block w-full rounded-lg bg-green-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-green-700"
+            class="mt-6 inline-block w-full rounded-lg bg-green-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-green-700"
           >
             Get Quote
           </a>

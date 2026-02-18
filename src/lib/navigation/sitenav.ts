@@ -5,6 +5,7 @@ import Users from 'lucide-svelte/icons/users';
 import Settings from 'lucide-svelte/icons/settings';
 import ImageIcon from 'lucide-svelte/icons/image';
 import MessageSquare from 'lucide-svelte/icons/message-square';
+import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
 
 export type NavItem = {
 	label: string;
@@ -49,6 +50,12 @@ export const SITE_NAV: NavItem[] = [
 		href: '/app/testimonials',
 		section: 'Testimonials',
 		icon: MessageSquare
+	},
+	{
+		label: 'QR Analytics',
+		href: '/app/analytics',
+		section: 'QR Analytics',
+		icon: BarChart3
 	},
 	{
 		label: 'Settings',
