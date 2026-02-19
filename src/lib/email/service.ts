@@ -1,38 +1,36 @@
-import { json } from '@sveltejs/kit';
-import { sendEmail } from '$lib/email/service';
-import { getContractConfirmationEmail } from '$lib/email/templates';
+import { Resend } from 'resend';
+import { RESEND_API_KEY } from '$env/static/private';
 
-export async function POST({ request }) {
+const resend = new Resend(RESEND_API_KEY);
+
+export async function sendEmail({
+	to,
+	subject,
+	html,
+	text
+}: {
+	to: string;
+	subject: string;
+	html: string;
+	text: string;
+}) {
 	try {
-		const body = await request.json();
-		const { customerEmail, customerName, services, schedule, totalPrice, signedAt } = body;
-
-		if (!customerEmail || !customerName) {
-			return json({ error: 'Missing required fields' }, { status: 400 });
-		}
-
-		const emailContent = getContractConfirmationEmail({
-			customerName,
-			services,
-			schedule,
-			totalPrice,
-			signedAt
+		const { data, error } = await resend.emails.send({
+			from: 'onboarding@resend.dev',
+			to,
+			subject,
+			html,
+			text
 		});
 
-		const result = await sendEmail({
-			to: customerEmail,
-			subject: emailContent.subject,
-			html: emailContent.html,
-			text: emailContent.text
-		});
-
-		if (result.success) {
-			return json({ success: true });
-		} else {
-			return json({ error: 'Failed to send email' }, { status: 500 });
+		if (error) {
+			console.error('Resend error:', error);
+			return { success: false, error };
 		}
+
+		return { success: true, data };
 	} catch (error) {
-		console.error('API error:', error);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		console.error('Email send error:', error);
+		return { success: false, error };
 	}
 }
