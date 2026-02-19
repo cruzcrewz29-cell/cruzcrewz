@@ -178,13 +178,13 @@
 			<p class="text-gray-500">Loading...</p>
 		</div>
 	{:else}
-		<div class="flex gap-4 overflow-x-auto pb-4">
-			{#each columns as column}
-				<div
-					class="min-w-[280px] flex-shrink-0 bg-white rounded-xl border border-gray-200 overflow-hidden"
-					ondragover={(e) => e.preventDefault()}
-					ondrop={(e) => handleDrop(e, column.id)}
-				>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+	{#each columns as column}
+		<div
+			class="bg-white rounded-xl border border-gray-200 overflow-hidden"
+			ondragover={(e) => e.preventDefault()}
+			ondrop={(e) => handleDrop(e, column.id)}
+		>
 					<div class="px-4 py-3 border-b border-gray-200 {column.color}">
 						<h3 class="font-medium text-sm text-gray-900">
 							{column.label}
