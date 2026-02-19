@@ -127,40 +127,49 @@
 	}
 
 	async function initCalendar() {
-		if (!browser) return;
+	if (!browser) return;
 
-		if (calendarInstance) {
-			calendarInstance.destroy();
-			calendarInstance = null;
-		}
-
-		const [{ Calendar }, dayGridPlugin] = await Promise.all([
-			import('@fullcalendar/core'),
-			import('@fullcalendar/daygrid').then(m => m.default)
-		]);
-
-		const events = jobs.map(job => ({
-			id: job.id,
-			title: `${job.customers?.name || job.customer_name || 'No Customer'} - ${job.service_type}`,
-			start: job.scheduled_date,
-			backgroundColor: getStatusColor(job.status),
-			borderColor: getStatusColor(job.status)
-		}));
-
-		calendarInstance = new Calendar(calendarEl, {
-			plugins: [dayGridPlugin],
-			initialView: 'dayGridMonth',
-			height: 'auto',
-			headerToolbar: {
-				left: 'prev,next',
-				center: 'title',
-				right: ''
-			},
-			events
-		});
-
-		calendarInstance.render();
+	if (calendarInstance) {
+		calendarInstance.destroy();
+		calendarInstance = null;
 	}
+
+	const [{ Calendar }, dayGridPlugin, interactionPlugin] = await Promise.all([
+		import('@fullcalendar/core'),
+		import('@fullcalendar/daygrid').then(m => m.default),
+		import('@fullcalendar/interaction').then(m => m.default)
+	]);
+
+	const events = jobs.map(job => ({
+		id: job.id,
+		title: `${job.customers?.name || job.customer_name || 'No Customer'} - ${job.service_type}`,
+		start: job.scheduled_date,
+		backgroundColor: getStatusColor(job.status),
+		borderColor: getStatusColor(job.status)
+	}));
+
+	calendarInstance = new Calendar(calendarEl, {
+		plugins: [dayGridPlugin, interactionPlugin],
+		initialView: 'dayGridMonth',
+		height: 'auto',
+		headerToolbar: {
+			left: 'prev,next',
+			center: 'title',
+			right: ''
+		},
+		events,
+		eventClick: (info) => {
+			const job = jobs.find(j => j.id === info.event.id);
+			if (job) openEditModal(job);
+		},
+		dateClick: (info) => {
+			formData.scheduled_date = info.dateStr;
+			openAddModal();
+		}
+	});
+
+	calendarInstance.render();
+}
 
 	function getStatusColor(status: string) {
 		const colors: Record<string, string> = {
