@@ -39,13 +39,13 @@
 		<p class="text-gray-500">Loading...</p>
 	</div>
 {:else if isAdmin}
-	<div class="min-h-screen bg-gray-50 flex">
+	<div class="min-h-screen bg-gray-50">
 		<AppSidebar />
 
-		<div class="flex-1 flex flex-col ml-64">
+		<div class="lg:ml-64 ml-0">
 			<AdminHeader />
 
-			<main class="flex-1 p-8">
+			<main class="p-4 lg:p-8">
 				{@render children()}
 			</main>
 		</div>

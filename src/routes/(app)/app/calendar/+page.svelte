@@ -186,10 +186,11 @@
 											{job.address}
 										</div>
 										{#if job.scheduled_date}
-											<div class="text-xs text-gray-500 mt-2">
-												📅 {formatDate(job.scheduled_date)}
-											</div>
-										{/if}
+	<div class="flex items-center gap-1 text-xs text-gray-500 mt-2">
+		<Calendar class="h-3 w-3" />
+		{formatDate(job.scheduled_date)}
+	</div>
+{/if}
 										{#if job.price}
 											<div class="text-xs font-medium text-gray-900 mt-2">
 												${job.price}

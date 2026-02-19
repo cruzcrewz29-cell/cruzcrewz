@@ -21,7 +21,7 @@
 	}
 </script>
 
-<aside class="fixed left-0 top-0 z-30 h-screen border-r bg-gradient-to-b from-slate-800 to-slate-900 transition-all duration-300 {collapsed ? 'w-20' : 'w-64'}">
+<aside class="hidden lg:block fixed left-0 top-0 z-30 h-screen border-r bg-gradient-to-b from-slate-800 to-slate-900 transition-all duration-300 {collapsed ? 'w-20' : 'w-64'}">
 	<div class="flex h-full flex-col">
 		<!-- Logo -->
 		<div class="flex h-16 items-center justify-between border-b border-slate-700 px-6">
