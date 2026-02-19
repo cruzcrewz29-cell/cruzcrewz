@@ -42,7 +42,7 @@
 	<div class="min-h-screen bg-gray-50 flex">
 		<AppSidebar />
 
-		<div class="flex-1 flex flex-col">
+		<div class="flex-1 flex flex-col ml-64">
 			<AdminHeader />
 
 			<main class="flex-1 p-8">
