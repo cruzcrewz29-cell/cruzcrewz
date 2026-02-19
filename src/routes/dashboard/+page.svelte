@@ -22,7 +22,6 @@
     'cancelled'
   ];
 
-  // Modal state
   let showModal = false;
 
   let newJob = {
@@ -49,7 +48,6 @@
 
     const jobId = draggingJob.id;
 
-    // optimistic update
     jobs = jobs.map(j =>
       j.id === jobId ? { ...j, status: newStatus } : j
     );
@@ -79,7 +77,6 @@
       jobs = [...jobs, data];
     }
 
-    // reset form
     newJob = {
       service_type: '',
       description: '',
@@ -91,23 +88,23 @@
   }
 </script>
 
-<div class="p-6">
+<div class="p-6 w-full overflow-hidden">
 
   <!-- Create Button -->
   <button
     class="mb-6 bg-black text-white px-4 py-2 rounded-lg"
-    on:click={() => showModal = true}
+    onclick={() => showModal = true}
   >
     + New Job
   </button>
 
   <!-- Kanban Columns -->
-  <div class="flex gap-4 overflow-x-auto">
+  <div class="flex gap-4 overflow-x-auto pb-4">
     {#each statuses as status}
-      <div
-        class="w-72 bg-gray-100 rounded-xl p-4"
-        on:dragover|preventDefault
-        on:drop={() => handleDrop(status)}
+      <div 
+        class="min-w-[280px] flex-shrink-0 bg-gray-100 rounded-xl p-4"
+        ondragover={(e) => e.preventDefault()}
+        ondrop={() => handleDrop(status)}
       >
         <h2 class="font-bold mb-4 capitalize">
           {status.replace('_', ' ')}
@@ -115,14 +112,14 @@
 
         {#each jobs.filter(j => j.status === status) as job}
           <div
-            class="bg-white p-3 rounded-lg shadow mb-3 cursor-grab"
+            class="bg-white p-3 rounded-lg shadow mb-3 cursor-grab break-words"
             draggable="true"
-            on:dragstart={() => handleDragStart(job)}
+            ondragstart={() => handleDragStart(job)}
           >
-            <div class="font-semibold">{job.service_type}</div>
-            <div class="text-sm text-gray-600">{job.description}</div>
-            <div class="text-sm mt-2">
-              {new Date(job.scheduled_date).toLocaleString()}
+            <div class="font-semibold break-words">{job.service_type}</div>
+            <div class="text-sm text-gray-600 break-words">{job.description}</div>
+            <div class="text-sm mt-2 break-words">
+              {new Date(job.scheduled_date).toLocaleDateString()}
             </div>
             <div class="text-sm font-bold mt-1">
               ${job.price}
@@ -136,43 +133,46 @@
 
 <!-- Modal -->
 {#if showModal}
-  <div class="fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div class="bg-white p-6 rounded-xl w-96">
+  <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-6 rounded-xl w-96 max-w-full">
       <h2 class="font-bold mb-4">Create Job</h2>
 
       <input
-        class="border w-full mb-2 p-2"
+        class="border w-full mb-2 p-2 rounded"
         placeholder="Service Type"
         bind:value={newJob.service_type}
       />
 
       <textarea
-        class="border w-full mb-2 p-2"
+        class="border w-full mb-2 p-2 rounded"
         placeholder="Description"
         bind:value={newJob.description}
       />
 
       <input
         type="datetime-local"
-        class="border w-full mb-2 p-2"
+        class="border w-full mb-2 p-2 rounded"
         bind:value={newJob.scheduled_date}
       />
 
       <input
         type="number"
-        class="border w-full mb-4 p-2"
+        class="border w-full mb-4 p-2 rounded"
         placeholder="Price"
         bind:value={newJob.price}
       />
 
       <div class="flex justify-end gap-2">
-        <button on:click={() => showModal = false}>
+        <button 
+          onclick={() => showModal = false}
+          class="px-3 py-1 rounded border border-gray-300"
+        >
           Cancel
         </button>
 
         <button
           class="bg-black text-white px-3 py-1 rounded"
-          on:click={createJob}
+          onclick={createJob}
         >
           Save
         </button>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { supabase } from '$lib/supabase';
 	import ContractSignature from './ContractSignature.svelte';
+	import { toast } from 'svelte-sonner';
 
 	type ContractData = {
 		jobId: string;
@@ -74,10 +75,14 @@ Additional Terms and Conditions
 		sentCode = Math.floor(100000 + Math.random() * 900000).toString();
 
 		// In production, integrate with Twilio/AWS SNS
-		// For now, just log it (you'll need to add SMS service)
+		// For now, just log it
 		console.log('SMS Code:', sentCode, 'to', contractData.customerPhone);
 
-		alert(`Verification code: ${sentCode} (In production, this will be sent via SMS)`);
+		toast.info(`Verification code: ${sentCode}`, {
+			description: 'In production, this will be sent via SMS',
+			duration: 8000
+		});
+
 		step = 3;
 	}
 
@@ -85,7 +90,7 @@ Additional Terms and Conditions
 		if (smsCode === sentCode) {
 			submitContract();
 		} else {
-			alert('Invalid verification code. Please try again.');
+			toast.error('Invalid verification code. Please try again.');
 		}
 	}
 
@@ -142,7 +147,7 @@ Additional Terms and Conditions
 			onComplete();
 		} catch (error) {
 			console.error('Contract submission error:', error);
-			alert('Failed to submit contract. Please try again.');
+			toast.error('Failed to submit contract. Please try again.');
 		} finally {
 			submitting = false;
 		}

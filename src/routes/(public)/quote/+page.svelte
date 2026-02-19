@@ -3,6 +3,7 @@
   import { supabase } from '$lib/supabase';
   import { services, serviceAreas } from '$lib/data/services';
   import ContractAgreement from '$lib/components/ContractAgreement.svelte';
+  import { toast } from 'svelte-sonner';
   
   // ZIP to State mapping
   const zipToState = {
@@ -196,7 +197,7 @@
       
     } catch (error) {
       console.error('Quote submission error:', error);
-      alert('Failed to submit quote. Please try again.');
+      toast.error('Failed to submit quote. Please try again.');
     } finally {
       submitting = false;
     }
@@ -209,7 +210,7 @@
   
   async function handleSignLater() {
     // Send quote email with link to sign later
-    await fetch('/api/send-quote-email', {
+    const response = await fetch('/api/send-quote-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -223,14 +224,24 @@
     });
     
     showQuoteOptions = false;
-    alert('Quote saved! We\'ve sent you an email with a link to sign the contract when you\'re ready.');
-    window.location.href = '/';
+    
+    if (response.ok) {
+      toast.success('Quote saved! Check your email for the contract signing link.');
+    } else {
+      toast.error('Quote saved, but email failed to send. Please contact us directly.');
+    }
+    
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 2000);
   }
   
   function handleContractComplete() {
     showContract = false;
-    alert('Thank you! Your service agreement has been signed. We\'ll contact you shortly to confirm your first appointment.');
-    window.location.href = '/';
+    toast.success('Thank you! Your service agreement has been signed. We\'ll contact you shortly.');
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 2000);
   }
   
   function handleContractCancel() {
@@ -249,30 +260,34 @@
     <!-- Progress Bar -->
     <div class="mb-8">
       <div class="flex items-center justify-between">
-        {#each [1, 2, 3, 4] as step}
-          <div class="flex items-center {step !== 4 ? 'flex-1' : ''}">
+        {#each [
+          { num: 1, label: 'Service' },
+          { num: 2, label: 'Property' },
+          { num: 3, label: 'Contact' },
+          { num: 4, label: 'Details' }
+        ] as step}
+          <div class="flex items-center {step.num !== 4 ? 'flex-1' : ''}">
             
+            <!-- Step Circle + Label -->
             <div class="flex flex-col items-center text-center">
               <div
                 class="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold
-                  {currentStep >= step
+                  {currentStep >= step.num
                     ? 'bg-green-600 text-white'
                     : 'bg-gray-200 text-gray-600'}"
               >
-                {step}
+                {step.num}
               </div>
               <span class="mt-2 text-xs font-medium text-gray-600">
-                {step === 1 && 'Service'}
-                {step === 2 && 'Property'}
-                {step === 3 && 'Contact'}
-                {step === 4 && 'Details'}
+                {step.label}
               </span>
             </div>
 
-            {#if step !== 4}
+            <!-- Connector -->
+            {#if step.num !== 4}
               <div
                 class="mx-4 h-1 flex-1 rounded
-                  {currentStep > step ? 'bg-green-600' : 'bg-gray-200'}"
+                  {currentStep > step.num ? 'bg-green-600' : 'bg-gray-200'}"
               ></div>
             {/if}
           </div>
@@ -577,8 +592,8 @@
 
 <!-- Quote Options Modal -->
 {#if showQuoteOptions && contractData}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={() => (showQuoteOptions = false)}>
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full" onclick={(e) => e.stopPropagation()}>
       <div class="px-6 py-4 border-b border-gray-200">
         <h2 class="text-xl font-semibold text-gray-900">Quote Ready!</h2>
       </div>

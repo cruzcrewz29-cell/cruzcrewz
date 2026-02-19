@@ -152,8 +152,7 @@
 			<p class="text-gray-500">Loading...</p>
 		</div>
 	{:else if view === 'kanban'}
-		<div class="grid grid-cols-4 gap-4">
-			{#each columns as column}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">			{#each columns as column}
 				<div
 					class="bg-white rounded-xl border border-gray-200 overflow-hidden"
 					ondragover={(e) => e.preventDefault()}
@@ -170,17 +169,17 @@
 
 					<div class="p-3 space-y-2 min-h-[600px]">
 						{#each getJobsByStatus(column.id) as job (job.id)}
-							<div
-								draggable="true"
-								ondragstart={(e) => handleDragStart(e, job.id)}
-								class="bg-white border border-gray-200 rounded-lg p-3 cursor-move hover:shadow-md transition-shadow"
-							>
-								<div class="font-medium text-sm text-gray-900 mb-1">
-									{job.customer_name}
-								</div>
-								<div class="text-xs text-gray-600 mb-2">
-									{job.service_type}
-								</div>
+						<div
+  draggable="true"
+  ondragstart={(e) => handleDragStart(e, job.id)}
+  class="bg-white border border-gray-200 rounded-lg p-3 cursor-move hover:shadow-md transition-shadow group break-words"
+>
+  <div class="flex items-start justify-between">
+    <div class="flex-1 min-w-0 break-words">
+      <div class="font-medium text-sm text-gray-900 break-words">
+        {job.customers?.name || 'No Customer'}
+      </div>
+      <div class="text-xs text-gray-600 mt-1 break-words">{job.service_type}</div>
 								<div class="text-xs text-gray-500">
 									{job.address}
 								</div>
@@ -195,7 +194,6 @@
 									</div>
 								{/if}
 							</div>
-						{/each}
 					</div>
 				</div>
 			{/each}

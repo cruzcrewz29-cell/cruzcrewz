@@ -178,10 +178,10 @@
 			<p class="text-gray-500">Loading...</p>
 		</div>
 	{:else}
-		<div class="grid grid-cols-4 gap-4">
+		<div class="flex gap-4 overflow-x-auto pb-4">
 			{#each columns as column}
 				<div
-					class="bg-white rounded-xl border border-gray-200 overflow-hidden"
+					class="min-w-[280px] flex-shrink-0 bg-white rounded-xl border border-gray-200 overflow-hidden"
 					ondragover={(e) => e.preventDefault()}
 					ondrop={(e) => handleDrop(e, column.id)}
 				>
@@ -197,14 +197,14 @@
 							<div
 								draggable="true"
 								ondragstart={(e) => handleDragStart(e, job.id)}
-								class="bg-white border border-gray-200 rounded-lg p-3 cursor-move hover:shadow-md transition-shadow group"
+								class="bg-white border border-gray-200 rounded-lg p-3 cursor-move hover:shadow-md transition-shadow group break-words"
 							>
 								<div class="flex items-start justify-between">
-									<div class="flex-1 min-w-0">
-										<div class="font-medium text-sm text-gray-900 truncate">
+									<div class="flex-1 min-w-0 break-words">
+										<div class="font-medium text-sm text-gray-900 break-words">
 											{job.customers?.name || 'No Customer'}
 										</div>
-										<div class="text-xs text-gray-600 mt-1">{job.service_type}</div>
+										<div class="text-xs text-gray-600 mt-1 break-words">{job.service_type}</div>
 										<div class="text-xs text-gray-500 mt-1">{formatDate(job.scheduled_date)}</div>
 										{#if job.price}
 											<div class="text-xs font-medium text-gray-900 mt-2">
@@ -212,7 +212,7 @@
 											</div>
 										{/if}
 									</div>
-									<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+									<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
 										<button
 											onclick={() => openEditModal(job)}
 											class="p-1 text-gray-400 hover:text-gray-900 rounded"

@@ -119,3 +119,92 @@ https://cruzcrewz.com | (555) 123-4567
 		`
 	};
 }
+
+export function getQuoteEmail(data: {
+	customerName: string;
+	services: string[];
+	schedule: string;
+	totalPrice: number;
+	jobId: string;
+}) {
+	const signUrl = `${process.env.PUBLIC_SITE_URL || 'http://localhost:5173'}/sign-contract/${data.jobId}`;
+	
+	return {
+		subject: 'Your Cruz Crewz Quote is Ready',
+		html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  
+  <div style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="margin: 0; font-size: 28px;">Cruz Crewz</h1>
+    <p style="margin: 10px 0 0 0; opacity: 0.9;">Your Quote is Ready!</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    
+    <h2 style="color: #16a34a; margin-top: 0;">Hi ${data.customerName},</h2>
+    
+    <p>Thank you for your interest in Cruz Crewz! Your personalized quote is ready.</p>
+
+    <div style="background: #f9fafb; border-left: 4px solid #16a34a; padding: 20px; margin: 25px 0; border-radius: 4px;">
+      <h3 style="margin-top: 0; color: #374151;">Quote Details</h3>
+      
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #6b7280;">Services:</td>
+          <td style="padding: 8px 0; color: #111827;">${data.services.join(', ')}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #6b7280;">Schedule:</td>
+          <td style="padding: 8px 0; color: #111827;">${data.schedule}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #6b7280;">Total Price:</td>
+          <td style="padding: 8px 0; color: #16a34a; font-weight: 700; font-size: 24px;">$${data.totalPrice.toFixed(2)}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${signUrl}" style="display: inline-block; background: #16a34a; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        Sign Service Agreement
+      </a>
+    </div>
+
+    <p style="color: #6b7280; font-size: 14px; text-align: center;">
+      This quote is valid for 30 days. Questions? Call us at <a href="tel:555-123-4567" style="color: #16a34a;">(555) 123-4567</a>
+    </p>
+
+  </div>
+
+  <div style="text-align: center; padding: 20px; color: #6b7280; font-size: 12px;">
+    <p style="margin: 5px 0;">Cruz Crewz Lawn Care</p>
+    <p style="margin: 5px 0;"><a href="https://cruzcrewz.com" style="color: #16a34a;">cruzcrewz.com</a></p>
+  </div>
+
+</body>
+</html>
+		`,
+		text: `Hi ${data.customerName},
+
+Your Cruz Crewz quote is ready!
+
+Services: ${data.services.join(', ')}
+Schedule: ${data.schedule}
+Total Price: $${data.totalPrice.toFixed(2)}
+
+Sign your service agreement: ${signUrl}
+
+This quote is valid for 30 days.
+Questions? Call (555) 123-4567
+
+Cruz Crewz Lawn Care
+https://cruzcrewz.com
+		`
+	};
+}

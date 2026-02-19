@@ -1,9 +1,7 @@
 export const siteConfig = {
   name: 'Cruz Crewz',
   description: 'Professional Lawn Maintenance',
-  
-  // Logo (local SVG file)
-  logo: '/logo.svg',
+
   
   // Hero images (uploaded to Supabase)
   images: {
