@@ -13,6 +13,7 @@
 		status: string;
 		scheduled_date: string;
 		price: number;
+		customers?: { name: string };
 	};
 
 	let jobs = $state<Job[]>([]);
@@ -31,7 +32,7 @@
 	onMount(async () => {
 		const { data } = await supabase
 			.from('jobs')
-			.select('*')
+			.select('*, customers(name)')
 			.order('scheduled_date', { ascending: true });
 
 		jobs = data || [];
@@ -152,7 +153,8 @@
 			<p class="text-gray-500">Loading...</p>
 		</div>
 	{:else if view === 'kanban'}
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">			{#each columns as column}
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+			{#each columns as column}
 				<div
 					class="bg-white rounded-xl border border-gray-200 overflow-hidden"
 					ondragover={(e) => e.preventDefault()}
@@ -169,31 +171,34 @@
 
 					<div class="p-3 space-y-2 min-h-[600px]">
 						{#each getJobsByStatus(column.id) as job (job.id)}
-						<div
-  draggable="true"
-  ondragstart={(e) => handleDragStart(e, job.id)}
-  class="bg-white border border-gray-200 rounded-lg p-3 cursor-move hover:shadow-md transition-shadow group break-words"
->
-  <div class="flex items-start justify-between">
-    <div class="flex-1 min-w-0 break-words">
-      <div class="font-medium text-sm text-gray-900 break-words">
-        {job.customers?.name || 'No Customer'}
-      </div>
-      <div class="text-xs text-gray-600 mt-1 break-words">{job.service_type}</div>
-								<div class="text-xs text-gray-500">
-									{job.address}
+							<div
+								draggable="true"
+								ondragstart={(e) => handleDragStart(e, job.id)}
+								class="bg-white border border-gray-200 rounded-lg p-3 cursor-move hover:shadow-md transition-shadow group break-words"
+							>
+								<div class="flex items-start justify-between">
+									<div class="flex-1 min-w-0 break-words">
+										<div class="font-medium text-sm text-gray-900 break-words">
+											{job.customers?.name || job.customer_name || 'No Customer'}
+										</div>
+										<div class="text-xs text-gray-600 mt-1 break-words">{job.service_type}</div>
+										<div class="text-xs text-gray-500 break-words">
+											{job.address}
+										</div>
+										{#if job.scheduled_date}
+											<div class="text-xs text-gray-500 mt-2">
+												📅 {formatDate(job.scheduled_date)}
+											</div>
+										{/if}
+										{#if job.price}
+											<div class="text-xs font-medium text-gray-900 mt-2">
+												${job.price}
+											</div>
+										{/if}
+									</div>
 								</div>
-								{#if job.scheduled_date}
-									<div class="text-xs text-gray-500 mt-2">
-										📅 {formatDate(job.scheduled_date)}
-									</div>
-								{/if}
-								{#if job.price}
-									<div class="text-xs font-medium text-gray-900 mt-2">
-										${job.price}
-									</div>
-								{/if}
 							</div>
+						{/each}
 					</div>
 				</div>
 			{/each}
