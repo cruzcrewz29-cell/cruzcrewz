@@ -9,6 +9,7 @@
 
 	let checking = $state(true);
 	let isAdmin = $state(false);
+	let sidebarCollapsed = $state(false);
 
 	$effect(async () => {
 		if (authStore.loading) return;
@@ -40,9 +41,9 @@
 	</div>
 {:else if isAdmin}
 	<div class="min-h-screen bg-gray-50">
-		<AppSidebar />
+		<AppSidebar bind:collapsed={sidebarCollapsed} />
 
-		<div class="lg:ml-64 ml-0">
+		<div class="transition-all duration-300 {sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} ml-0">
 			<AdminHeader />
 
 			<main class="p-4 lg:p-8">
