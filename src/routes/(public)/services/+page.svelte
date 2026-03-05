@@ -138,17 +138,14 @@
             </div>
 
             <!-- Pricing -->
-            <div class="mt-6 border-t pt-6">
-              <h4 class="text-sm font-semibold text-gray-900">Pricing:</h4>
-              <div class="mt-3 space-y-2">
-                {#each service.pricing as price}
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-600">{price.label}</span>
-                    <span class="font-semibold text-gray-900">${price.price}</span>
-                  </div>
-                {/each}
-              </div>
-            </div>
+            <div class="mt-6">
+            <a
+              href="/quote?service={service.slug}"
+              class="block w-full rounded-lg bg-green-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            >
+              Get Custom Quote
+            </a>
+          </div>
 
             <!-- CTA -->
             <div class="mt-6">

@@ -21,7 +21,7 @@
         <div class="md:col-span-2">
           <h3 class="text-lg font-bold text-white">Cruz Crewz</h3>
           <p class="mt-4 text-sm">
-            Professional lawn care and landscaping services serving the greater Atlanta area. 
+            Professional lawn care and landscaping services serving Northwest Indiana and the greater Chicagoland area. 
             Licensed, insured, and committed to excellence.
           </p>
           <div class="mt-6 flex gap-4">
@@ -44,10 +44,10 @@
         <div>
           <h4 class="text-sm font-semibold uppercase tracking-wider text-white">Services</h4>
           <ul class="mt-4 space-y-2 text-sm">
-            <li><a href="/services" class="transition-colors hover:text-white">Lawn Mowing</a></li>
-            <li><a href="/services" class="transition-colors hover:text-white">Fertilization</a></li>
+            <li><a href="/services" class="transition-colors hover:text-white">Lawn Mowing</a></li>           
             <li><a href="/services" class="transition-colors hover:text-white">Aeration</a></li>
             <li><a href="/services" class="transition-colors hover:text-white">Landscaping</a></li>
+            <li><a href="/services" class="transition-colors hover:text-white">Fall & Spring Cleaning</a></li>
           </ul>
         </div>
         

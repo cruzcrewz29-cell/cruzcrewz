@@ -7,29 +7,29 @@
   
   const stats = [
     { label: 'Happy Customers', value: '5,000+' },
-    { label: 'Lawns Serviced', value: '100,000+' },
+    { label: 'Lawns Serviced', value: '25,000+' },
     { label: 'Years Experience', value: '15+' },
-    { label: 'Service Areas', value: '40+' }
+    { label: 'Service Areas', value: '30+' }
   ];
   
-  const topServices = [
+   const topServices = [
     {
       name: 'Lawn Mowing',
-      description: 'Weekly or bi-weekly professional mowing service',
-      price: 'From $60',
+      description: 'Weekly or bi-weekly professional mowing with flip edging included',
+      price: 'Custom Quote',
       href: '/quote?service=lawn-mowing'
     },
     {
-      name: 'Fertilization',
-      description: 'Professional-grade lawn treatment programs',
-      price: 'From $95',
-      href: '/quote?service=fertilization-weed-control'
+      name: 'Bush, Shrub & Tree Care',
+      description: 'Professional trimming, pruning, and removal services',
+      price: 'Custom Quote',
+      href: '/quote?service=tree-care'
     },
     {
-      name: 'Landscape Care',
-      description: 'Complete landscape maintenance and design',
-      price: 'From $195',
-      href: '/quote?service=landscape-maintenance'
+      name: 'Spring & Fall Cleanups',
+      description: 'Complete seasonal property cleanup and maintenance',
+      price: 'Custom Quote',
+      href: '/quote?service=seasonal-cleanup'
     }
   ];
   
@@ -145,6 +145,8 @@
   </div>
 </section>
 
+
+
 <!-- Top Services Section -->
 <section class="bg-gray-50 py-20">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -167,11 +169,11 @@
               </svg>
             {:else if index === 1}
               <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
               </svg>
             {:else}
               <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0l4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0l-5.571 3-5.571-3" />
               </svg>
             {/if}
           </div>
@@ -272,6 +274,17 @@
               </svg>
             {/each}
           </div>
+        <div class="mt-12 text-center">
+          <a
+            href="/portfolio"
+            class="inline-flex items-center text-base font-semibold text-green-600 hover:text-green-700"
+          >
+            View Our Work
+            <svg class="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </a>
+        </div>
           <p class="mt-4 text-gray-700">{testimonial.text}</p>
           <div class="mt-6">
             <div class="font-semibold text-gray-900">{testimonial.name}</div>
@@ -310,7 +323,7 @@
           <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
           </svg>
-          Call (555) 123-4567
+          Call (866) 873.2789
         </a>
       </div>
     </div>

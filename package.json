@@ -27,6 +27,7 @@
 		"@fullcalendar/core": "^6.1.20",
 		"@fullcalendar/daygrid": "^6.1.20",
 		"@fullcalendar/interaction": "^6.1.20",
+		"@googlemaps/google-maps-services-js": "^3.4.2",
 		"@stripe/stripe-js": "^8.7.0",
 		"@supabase/ssr": "^0.8.0",
 		"@supabase/supabase-js": "^2.95.3",

@@ -306,7 +306,7 @@
 											</div>
 										{/if}
 									</div>
-									<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
+									<div class="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
 										<button
 											onclick={() => openEditModal(job)}
 											class="p-1 text-gray-400 hover:text-gray-900 rounded"

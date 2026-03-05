@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { supabase } from '$lib/supabase';
 	import ContractSignature from './ContractSignature.svelte';
+	import PaymentForm from './PaymentForm.svelte';
 	import { toast } from 'svelte-sonner';
 
 	type ContractData = {
@@ -20,7 +21,7 @@
 		onCancel: () => void;
 	}>();
 
-	let step = $state(1); // 1: Review, 2: Sign, 3: SMS Verify
+	let step = $state(1); // 1: Review, 2: Sign, 3: SMS Verify, 4: Payment
 	let termsAccepted = $state(false);
 	let signatureData = $state('');
 	let smsCode = $state('');
@@ -71,11 +72,8 @@ Additional Terms and Conditions
 	}
 
 	async function sendSMSVerification() {
-		// Generate 6-digit code
 		sentCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-		// In production, integrate with Twilio/AWS SNS
-		// For now, just log it
 		console.log('SMS Code:', sentCode, 'to', contractData.customerPhone);
 
 		toast.info(`Verification code: ${sentCode}`, {
@@ -88,13 +86,17 @@ Additional Terms and Conditions
 
 	function verifySMSCode() {
 		if (smsCode === sentCode) {
-			submitContract();
+			step = 4; // Go to payment step
 		} else {
 			toast.error('Invalid verification code. Please try again.');
 		}
 	}
 
-	async function submitContract() {
+	async function handlePaymentSuccess() {
+		await finalizeContract();
+	}
+
+	async function finalizeContract() {
 		submitting = true;
 
 		try {
@@ -163,7 +165,7 @@ Additional Terms and Conditions
 		<!-- Header -->
 		<div class="px-6 py-4 border-b border-gray-200">
 			<h2 class="text-xl font-semibold text-gray-900">Service Agreement</h2>
-			<p class="text-sm text-gray-600 mt-1">Step {step} of 3</p>
+			<p class="text-sm text-gray-600 mt-1">Step {step} of 4</p>
 		</div>
 
 		<!-- Step 1: Review Contract -->
@@ -317,9 +319,41 @@ Additional Terms and Conditions
 				<button
 					onclick={verifySMSCode}
 					disabled={smsCode.length !== 6 || submitting}
-					class="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+					class="flex-1 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
 				>
-					{submitting ? 'Submitting...' : 'Complete Agreement'}
+					Continue to Payment
+				</button>
+			</div>
+		{/if}
+
+		<!-- Step 4: Payment -->
+		{#if step === 4}
+			<div class="p-6 space-y-6">
+				<div>
+					<h3 class="font-semibold text-gray-900 mb-2">Payment</h3>
+					<p class="text-sm text-gray-600 mb-4">
+						Enter your card details to complete the service agreement.
+					</p>
+					<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+						<p class="text-sm text-blue-800">
+							<strong>Amount Due:</strong> ${contractData.totalPrice.toFixed(2)}
+						</p>
+					</div>
+				</div>
+
+				<PaymentForm
+					amount={contractData.totalPrice}
+					jobId={contractData.jobId}
+					onSuccess={handlePaymentSuccess}
+				/>
+			</div>
+
+			<div class="px-6 py-4 border-t border-gray-200">
+				<button
+					onclick={() => (step = 3)}
+					class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+				>
+					Back
 				</button>
 			</div>
 		{/if}

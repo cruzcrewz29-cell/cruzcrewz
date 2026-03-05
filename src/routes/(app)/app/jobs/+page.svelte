@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { supabase } from '$lib/supabase';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import Plus from 'lucide-svelte/icons/plus';
 	import Pencil from 'lucide-svelte/icons/pencil';
 	import Trash2 from 'lucide-svelte/icons/trash-2';
+	import PaymentForm from '$lib/components/PaymentForm.svelte';
+	import CreditCard from 'lucide-svelte/icons/credit-card';
 
 	type Customer = { id: string; name: string; };
 
@@ -23,7 +26,8 @@
 	let loading = $state(true);
 	let showModal = $state(false);
 	let editingJob = $state<Job | null>(null);
-	let deletingJobId = $state<string | null>(null);
+	let showPaymentModal = $state(false);
+	let paymentJob = $state<Job | null>(null);
 
 	const STATUS_OPTIONS = ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'];
 
@@ -153,6 +157,16 @@
 	function formatCurrency(amount: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 	}
+
+	function openPaymentModal(job: Job) {
+		paymentJob = job;
+		showPaymentModal = true;
+	}
+
+	function handlePaymentSuccess() {
+		showPaymentModal = false;
+		toast.success('Payment processed successfully!');
+	}
 </script>
 
 <div class="space-y-6">
@@ -179,12 +193,12 @@
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-	{#each columns as column}
-		<div
-			class="bg-white rounded-xl border border-gray-200 overflow-hidden"
-			ondragover={(e) => e.preventDefault()}
-			ondrop={(e) => handleDrop(e, column.id)}
-		>
+			{#each columns as column}
+				<div
+					class="bg-white rounded-xl border border-gray-200 overflow-hidden"
+					ondragover={(e) => e.preventDefault()}
+					ondrop={(e) => handleDrop(e, column.id)}
+				>
 					<div class="px-4 py-3 border-b border-gray-200 {column.color}">
 						<h3 class="font-medium text-sm text-gray-900">
 							{column.label}
@@ -212,7 +226,16 @@
 											</div>
 										{/if}
 									</div>
-									<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
+									<div class="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
+										{#if job.price && job.status !== 'completed'}
+											<button
+												onclick={() => openPaymentModal(job)}
+												class="p-1 text-gray-400 hover:text-green-600 rounded"
+												title="Collect Payment"
+											>
+												<CreditCard class="h-3.5 w-3.5" />
+											</button>
+										{/if}
 										<button
 											onclick={() => openEditModal(job)}
 											class="p-1 text-gray-400 hover:text-gray-900 rounded"
@@ -261,22 +284,23 @@
 				</div>
 
 				<div>
-	<label class="block text-sm font-medium text-gray-700 mb-1">
-		Service Type <span class="text-red-500">*</span>
-	</label>
-	<select
-		bind:value={formData.service_type}
-		required
-		class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-	>
-		<option value="">Select a service...</option>
-		<option value="Lawn Mowing">Lawn Mowing</option>
-		<option value="Trimming & Edging">Trimming & Edging</option>
-		<option value="Aeration & Overseeding">Aeration & Overseeding</option>
-		<option value="Leaf Removal">Leaf Removal</option>
-		<option value="Landscape Maintenance">Landscape Maintenance</option>
-	</select>
-</div>
+					<label class="block text-sm font-medium text-gray-700 mb-1">
+						Service Type <span class="text-red-500">*</span>
+					</label>
+					<select
+						bind:value={formData.service_type}
+						required
+						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+					>
+						<option value="">Select a service...</option>
+						<option value="Lawn Mowing">Lawn Mowing</option>
+						<option value="Trimming & Edging">Trimming & Edging</option>
+						<option value="Aeration & Overseeding">Aeration & Overseeding</option>
+						<option value="Leaf Removal">Leaf Removal</option>
+						<option value="Landscape Maintenance">Landscape Maintenance</option>
+					</select>
+				</div>
+
 				<div>
 					<label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
 					<textarea
@@ -340,6 +364,43 @@
 					</button>
 				</div>
 			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- Payment Modal -->
+{#if showPaymentModal && paymentJob}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={() => (showPaymentModal = false)}>
+		<div class="bg-white rounded-xl shadow-xl max-w-md w-full" onclick={(e) => e.stopPropagation()}>
+			<div class="px-6 py-4 border-b border-gray-200">
+				<h2 class="text-lg font-semibold text-gray-900">Collect Payment</h2>
+				<p class="text-sm text-gray-600 mt-1">
+					{paymentJob.customers?.name || 'Customer'} - {paymentJob.service_type}
+				</p>
+			</div>
+
+			<div class="p-6">
+				<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+					<p class="text-sm text-blue-800">
+						<strong>Amount:</strong> ${paymentJob.price?.toFixed(2)}
+					</p>
+				</div>
+
+				<PaymentForm
+					amount={paymentJob.price || 0}
+					jobId={paymentJob.id}
+					onSuccess={handlePaymentSuccess}
+				/>
+			</div>
+
+			<div class="px-6 py-4 border-t border-gray-200">
+				<button
+					onclick={() => (showPaymentModal = false)}
+					class="w-full px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+				>
+					Cancel
+				</button>
+			</div>
 		</div>
 	</div>
 {/if}

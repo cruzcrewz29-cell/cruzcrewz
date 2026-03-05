@@ -14,102 +14,86 @@ export interface Service {
   frequency: 'one-time' | 'recurring' | 'seasonal';
 }
 
-export const services: Service[] = [
-  {
-    id: 'mowing',
-    name: 'Lawn Mowing',
-    slug: 'lawn-mowing',
-    description: 'Professional lawn mowing service to keep your grass at the perfect height year-round.',
-    icon: 'Zap', // Lightning bolt
-    features: [
-      'Precision cutting to optimal height',
-      'String trimming around edges',
-      'Blowing clippings off hard surfaces',
-      'Weekly or bi-weekly scheduling'
-    ],
-    pricing: [
-      { tier: 'small', price: 60, label: 'Small Yard (< 5,000 sq ft)' },
-      { tier: 'medium', price: 85, label: 'Medium Yard (5,000-10,000 sq ft)' },
-      { tier: 'large', price: 125, label: 'Large Yard (> 10,000 sq ft)' }
-    ],
-    frequency: 'recurring'
-  },
-  {
-    id: 'trimming',
-    name: 'Trimming & Edging',
-    slug: 'trimming-edging',
-    description: 'Clean, crisp edges and perfectly trimmed borders for a manicured look.',
-    icon: 'Scissors',
-    features: [
-      'String trimming around obstacles',
-      'Edging along walkways and driveways',
-      'Trimming around flower beds',
-      'Clean-up of debris'
-    ],
-    pricing: [
-      { tier: 'small', price: 60, label: 'Small Property' },
-      { tier: 'medium', price: 80, label: 'Medium Property' },
-      { tier: 'large', price: 110, label: 'Large Property' }
-    ],
-    frequency: 'recurring'
-  },
-  {
-    id: 'aeration',
-    name: 'Aeration & Overseeding',
-    slug: 'aeration-overseeding',
-    description: 'Core aeration to relieve soil compaction and overseeding for a thicker, healthier lawn.',
-    icon: 'Sparkles',
-    features: [
-      'Core aeration to improve soil health',
-      'Premium grass seed selection',
-      'Starter fertilizer application',
-      'Post-treatment care instructions'
-    ],
-    pricing: [
-      { tier: 'small', price: 175, label: 'Small Lawn (< 5,000 sq ft)' },
-      { tier: 'medium', price: 275, label: 'Medium Lawn (5,000-10,000 sq ft)' },
-      { tier: 'large', price: 425, label: 'Large Lawn (> 10,000 sq ft)' }
-    ],
-    frequency: 'seasonal'
-  },
-  {
-    id: 'leaf-removal',
-    name: 'Leaf Removal',
-    slug: 'leaf-removal',
-    description: 'Complete fall cleanup including leaf removal, blowing, and disposal.',
-    icon: 'Leaf',
-    features: [
-      'Complete leaf removal from lawn',
-      'Cleaning of beds and gardens',
-      'Gutter cleaning available',
-      'Eco-friendly disposal'
-    ],
-    pricing: [
-      { tier: 'small', price: 125, label: 'Small Property (light coverage)' },
-      { tier: 'medium', price: 195, label: 'Medium Property (moderate coverage)' },
-      { tier: 'large', price: 325, label: 'Large Property (heavy coverage)' }
-    ],
-    frequency: 'seasonal'
-  },
-  {
-    id: 'landscape-maintenance',
-    name: 'Landscape Maintenance',
-    slug: 'landscape-maintenance',
-    description: 'Full-service landscape care including pruning, mulching, and bed maintenance.',
-    icon: 'Trees',
-    features: [
-      'Shrub and tree pruning',
-      'Mulch installation and refresh',
-      'Bed weeding and maintenance',
-      'Seasonal plant care'
-    ],
-    pricing: [
-      { tier: 'small', price: 195, label: 'Basic Package (1-2 beds)' },
-      { tier: 'medium', price: 350, label: 'Standard Package (3-5 beds)' },
-      { tier: 'large', price: 575, label: 'Premium Package (6+ beds)' }
-    ],
-    frequency: 'recurring'
-  }
+export const services = [
+	{
+		id: 'lawn-mowing',
+		name: 'Lawn Mowing',
+		slug: 'lawn-mowing',
+		icon: 'zap',
+		description: 'Professional lawn mowing service with flip edging included',
+		frequency: 'recurring',
+		features: [
+			'Professional mowing',
+			'Flip edging included',
+			'Grass clippings mulched or bagged',
+			'Consistent cutting height',
+			'Weekly or bi-weekly service'
+		],
+		pricing: [] // Removed - using lot size calculation
+	},
+	{
+		id: 'trimming-edging',
+		name: 'Trimming & Edging',
+		slug: 'trimming-edging',
+		icon: 'sparkles',
+		description: 'Precision trimming and edging for a polished look',
+		frequency: 'recurring',
+		features: [
+			'String trimming around obstacles',
+			'Clean edge along walkways',
+			'Professional finish',
+			'Debris removal'
+		],
+		pricing: []
+	},
+	{
+		id: 'tree-care',
+		name: 'Bush, Shrub & Tree Care',
+		slug: 'tree-care',
+		icon: 'sun',
+		description: 'Expert trimming, pruning, and removal services',
+		frequency: 'seasonal',
+		features: [
+			'Professional pruning',
+			'Shaping and trimming',
+			'Tree and shrub removal',
+			'Branch cleanup and hauling',
+			'Health assessment'
+		],
+		pricing: []
+	},
+	{
+		id: 'seasonal-cleanup',
+		name: 'Spring & Fall Cleanups',
+		slug: 'seasonal-cleanup',
+		icon: 'layers',
+		description: 'Complete seasonal property cleanup and maintenance',
+		frequency: 'seasonal',
+		features: [
+			'Leaf removal and disposal',
+			'Debris cleanup',
+			'Bed preparation',
+			'Gutter cleaning',
+			'Property detailing'
+		],
+		pricing: []
+	},
+	{
+		id: 'landscape-maintenance',
+		name: 'Landscape Maintenance',
+		slug: 'landscape-maintenance',
+		icon: 'grid',
+		description: 'Complete landscape care and maintenance',
+		frequency: 'recurring',
+		features: [
+			'Mulching and bed maintenance',
+			'Weed control',
+			'Plant care',
+			'Seasonal planting',
+			'Complete property upkeep'
+		],
+		pricing: []
+	}
 ];
 
 export const serviceAreas = [

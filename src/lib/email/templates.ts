@@ -70,7 +70,7 @@ export function getContractConfirmationEmail(data: {
     <div style="background: #fef3c7; border: 1px solid #fbbf24; padding: 15px; margin: 25px 0; border-radius: 8px;">
       <p style="margin: 0; color: #92400e;">
         <strong>📱 Questions?</strong><br>
-        Call us at <a href="tel:555-123-4567" style="color: #16a34a; text-decoration: none;">(555) 123-4567</a> or reply to this email.
+        Call us at <a href="tel:(866).873.2789" style="color: #16a34a; text-decoration: none;">(866)873.2789</a> or reply to this email.
       </p>
     </div>
 
@@ -86,7 +86,7 @@ export function getContractConfirmationEmail(data: {
     <p style="margin: 5px 0;">Professional Lawn Care Services</p>
     <p style="margin: 5px 0;">
       <a href="https://cruzcrewz.com" style="color: #16a34a; text-decoration: none;">cruzcrewz.com</a> | 
-      <a href="tel:555-123-4567" style="color: #16a34a; text-decoration: none;">(555) 123-4567</a>
+      <a href="tel:(866)873.2789" style="color: #16a34a; text-decoration: none;">(866)873.2789</a>
     </p>
   </div>
 
@@ -111,11 +111,11 @@ What Happens Next?
 2. We'll send you a reminder before each scheduled service
 3. After each visit, you'll receive a service completion notification
 
-Questions? Call us at (555) 123-4567 or reply to this email.
+Questions? Call us at (866) 873.2789 or reply to this email.
 
 ---
 Cruz Crewz Lawn Care
-https://cruzcrewz.com | (555) 123-4567
+https://cruzcrewz.com | (866) 873.2789
 		`
 	};
 }
@@ -177,7 +177,7 @@ export function getQuoteEmail(data: {
     </div>
 
     <p style="color: #6b7280; font-size: 14px; text-align: center;">
-      This quote is valid for 30 days. Questions? Call us at <a href="tel:555-123-4567" style="color: #16a34a;">(555) 123-4567</a>
+      This quote is valid for 30 days. Questions? Call us at <a href="tel:(866)873.2789" style="color: #16a34a;">(866)873.2789</a>
     </p>
 
   </div>
@@ -201,7 +201,7 @@ Total Price: $${data.totalPrice.toFixed(2)}
 Sign your service agreement: ${signUrl}
 
 This quote is valid for 30 days.
-Questions? Call (555) 123-4567
+Questions? Call (866) 873.2789
 
 Cruz Crewz Lawn Care
 https://cruzcrewz.com

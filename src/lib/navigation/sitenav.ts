@@ -6,6 +6,8 @@ import Settings from 'lucide-svelte/icons/settings';
 import ImageIcon from 'lucide-svelte/icons/image';
 import MessageSquare from 'lucide-svelte/icons/message-square';
 import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
+import DollarSign from 'lucide-svelte/icons/dollar-sign';
+
 
 export type NavItem = {
 	label: string;
@@ -62,5 +64,11 @@ export const SITE_NAV: NavItem[] = [
 		href: '/app/settings',
 		section: 'Settings',
 		icon: Settings
-	}
+	},
+	{
+	label: 'Pricing',
+	href: '/app/pricing',
+	section: 'Pricing',
+	icon: DollarSign
+}
 ];
