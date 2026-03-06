@@ -5,6 +5,7 @@
   import ContractAgreement from '$lib/components/ContractAgreement.svelte';
   import { toast } from 'svelte-sonner';
   import { debounce } from '$lib/utils';
+  import { lookupCookCountyLotSize } from '$lib/lot-size/cook-county-client';
 
   let addressSuggestions = $state<string[]>([]);
   let showSuggestions = $state(false);
@@ -66,6 +67,7 @@
     formData.city = '';
     formData.zipCode = '';
     try {
+      // Step 1: geocode on server (gets city/state/zip/county)
       const res = await fetch('/api/lookup-address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,8 +81,15 @@
         formData.state   = info.state || '';
         formData.zipCode = info.zip   || '';
         isValidZip = serviceAreas.includes(formData.zipCode);
-        if (info.lot_size_sqft && info.county) await calculatePriceFromLotSize(info.lot_size_sqft, info.county);
         errors = {};
+
+        // Step 2: lot size lookup direct from browser (bypasses Netlify network block)
+        if (info.county === 'Cook' && info.state === 'IL' && info.street_address) {
+          const sqft = await lookupCookCountyLotSize(info.street_address);
+          if (sqft) {
+            await calculatePriceFromLotSize(sqft, info.county);
+          }
+        }
       }
     } catch (e) {
       console.error('Address lookup failed:', e);
