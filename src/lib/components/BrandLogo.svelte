@@ -1,13 +1,12 @@
 <script lang="ts">
   export let size: 'sm' | 'md' | 'lg' = 'md';
   export let className: string = '';
-
- const sizes = {
-  sm: 'h-12',
-  md: 'h-16',
-  lg: 'h-30 md:h-34 lg:h-38'
-};
-
+  
+  const sizes = {
+    sm: 'h-12',
+    md: 'h-16',
+    lg: 'h-30 md:h-34 lg:h-38'
+  };
 </script>
 
 <div class={`flex items-center ${className}`}>
@@ -18,14 +17,6 @@
     role="img"
     aria-label="Cruz Crewz Professional Lawn Maintenance"
   >
-<path
-  d="M400 130 Q600 95 800 130"
-  fill="none"
-  stroke="#1f7a3f"
-  stroke-width="4"
-  stroke-linecap="round"
-  opacity="0.4"
-/>
     <text
       x="600"
       y="165"
@@ -38,7 +29,7 @@
     >
       CRUZ CREWZ
     </text>
-
+    
     <text
       x="600"
       y="230"

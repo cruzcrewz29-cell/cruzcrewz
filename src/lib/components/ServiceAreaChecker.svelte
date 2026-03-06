@@ -43,7 +43,7 @@
             bind:value={zipCode}
             maxlength="5"
             placeholder="60660"
-            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder:text-gray-400"
             onkeydown={(e) => e.key === 'Enter' && checkServiceArea()}
           />
           <button

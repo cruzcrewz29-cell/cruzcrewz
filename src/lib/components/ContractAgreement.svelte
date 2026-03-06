@@ -32,19 +32,23 @@
 	const CONTRACT_TERMS = `
 Additional Terms and Conditions
 
-1. Liability:
-   • The Service Provider is not liable for any property damage, unless caused by negligence or willful misconduct.
-   • The Client agrees to indemnify and hold the Service Provider harmless from any claims or expenses arising from the services provided, except those arising from the Service Provider's negligence.
+1. Liability: • The Service Provider is not liable for any property damage, unless caused by negligence or willful misconduct. • The Client agrees to indemnify and hold the Service Provider harmless from any claims or expenses arising from the services provided, except those arising from the Service Provider's negligence.
 
-2. Termination:
-   • Either party may terminate this contract with a 30-day written notice.
-   • The Service Provider reserves the right to terminate the contract immediately in case of non-payment or breach of terms.
+2. Termination: • Either party may terminate this contract with a 30-day written notice. • The Service Provider reserves the right to terminate the contract immediately in case of non-payment or breach of terms.
 
-3. Force Majeure:
-   • The Service Provider is not liable for failure to perform services due to circumstances beyond their control, such as severe weather or natural disasters.
+3. Force Majeure: • The Service Provider is not liable for failure to perform services due to circumstances beyond their control, such as severe weather or natural disasters.
 
-4. Governing Law:
-   This contract is governed by the laws of the states of Illinois and Indiana, as applicable to the service location.
+4. Governing Law: This contract is governed by the laws of the states of Illinois and Indiana, as applicable to the service location.
+
+5. Estimates and Service Adjustments: All digital estimates are preliminary and based on information provided by the Client. The Service Provider reserves the right to adjust the final price if the actual site conditions (e.g., grass height, debris, property size, or terrain) differ from the description provided. If an adjustment is necessary, the Service Provider will notify the Client before beginning work.
+
+6. Access to Property: The Client must ensure that the service area is accessible (e.g., unlocked gates) and free of obstructions, including pet waste, toys, hoses, and large debris, on the scheduled service day. The Service Provider reserves the right to skip inaccessible areas or charge a "trip fee" if the property cannot be serviced.
+
+7. Underground Installations: The Client is responsible for marking or notifying the Service Provider of any shallow-buried cables, wires, or irrigation heads. The Service Provider is not liable for damage to unmarked or improperly installed underground items (e.g., fiber optic lines, lighting wires, or invisible pet fences).
+
+8. Pet Waste: The Client agrees to clear the lawn of pet waste prior to service. If excessive waste is present, the Service Provider may, at their discretion, charge an additional cleanup fee or decline service for that visit.
+
+9. Payment Terms: Payment is due upon receipt of the invoice unless otherwise agreed. Late payments exceeding 15 days will incur a late fee. The Service Provider may pause all scheduled services until the account is brought current.
 	`.trim();
 
 	function getLocation() {

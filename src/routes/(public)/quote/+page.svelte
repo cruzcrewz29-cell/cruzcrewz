@@ -1,10 +1,17 @@
-<script>
+<script lang="ts">
   import { page } from '$app/stores';
   import { supabase } from '$lib/supabase';
   import { services, serviceAreas } from '$lib/data/services';
   import ContractAgreement from '$lib/components/ContractAgreement.svelte';
   import { toast } from 'svelte-sonner';
+  import { debounce } from '$lib/utils';
+
   
+  let addressSuggestions = $state<string[]>([]);
+  let showSuggestions = $state(false);
+  let lookingUpAddress = $state(false);
+  let lotSizeInfo = $state<{ size: number; source: string } | null>(null);
+
   // ZIP to State mapping
   const zipToState = {
     '46': 'IN', // Indiana
@@ -49,6 +56,67 @@
   let showQuoteOptions = $state(false);
   let contractData = $state(null);
   let submitting = $state(false);
+
+  const searchAddresses = debounce(async (query: string) => {
+  if (query.length < 3) {
+    addressSuggestions = [];
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/autocomplete-address?query=${encodeURIComponent(query)}`);
+    const data = await response.json();
+    
+    if (data.predictions) {
+      addressSuggestions = data.predictions.map((p: any) => p.description);
+    }
+  } catch (error) {
+    console.error('Address search error:', error);
+  }
+}, 300);
+
+async function selectAddress(address: string) {
+    showSuggestions = false;
+    lookingUpAddress = true;
+    formData.address = address;
+    formData.city = '';
+    formData.zipCode = '';
+
+    try {
+      const response = await fetch('/api/lookup-address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address })
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const info = result.data;
+        
+        formData.address = info.street_address || info.address.split(',')[0];
+        formData.city = info.city || '';
+        formData.state = info.state || '';
+        formData.zipCode = info.zip || '';
+        
+        isValidZip = serviceAreas.includes(formData.zipCode);
+        
+      
+        // If the API returned a lot size, use the new calculation logic
+        if (info.lot_size_sqft && info.county) {
+            await calculatePriceFromLotSize(info.lot_size_sqft, info.county);
+        }
+        // ---------------------
+
+        errors = {};
+      } 
+    } catch (error) {
+      console.error('Address lookup failed:', error);
+      toast.error('Could not load address details.');
+    } finally {
+      lookingUpAddress = false;
+    }
+  }
   
   // Auto-detect state from ZIP code
   $effect(() => {
@@ -104,7 +172,12 @@
       if (!formData.address) stepErrors.address = 'Address is required';
       if (!formData.city) stepErrors.city = 'City is required';
       if (!formData.zipCode) stepErrors.zipCode = 'ZIP code is required';
+      if (!formData.state) stepErrors.state = 'State is required';
       if (formData.zipCode && !isValidZip) stepErrors.zipCode = 'Sorry, we don\'t service this area yet';
+      if (formData.zipCode && !isValidZip) {
+    stepErrors.zipCode = 'Sorry, we don\'t service this area yet';
+      
+  }
     }
     
     if (step === 3) {
@@ -119,8 +192,17 @@
   }
   
   function nextStep() {
+    // This logs the current state so we can see what's missing
+    console.log('Validating Step:', currentStep);
+    console.log('Current Form Data:', formData);
+    
     if (validateStep(currentStep)) {
       currentStep++;
+      errors = {}; 
+    } else {
+      // This will show exactly which field failed
+      console.log('Validation failed! Current errors:', errors);
+      toast.error('Please check the highlighted fields.');
     }
   }
   
@@ -248,14 +330,45 @@
     showContract = false;
     showQuoteOptions = true;
   }
+
+  async function calculatePriceFromLotSize(sqft: number, county: string) {
+	if (!selectedServiceData) return;
+
+	// Get pricing rule for this county/service
+	const { data: pricingRule } = await supabase
+		.from('pricing_rules')
+		.select('*')
+		.eq('county', county)
+		.eq('state', formData.state)
+		.eq('service_type', selectedServiceData.name)
+		.single();
+
+	if (pricingRule) {
+		let price = sqft * pricingRule.price_per_sqft;
+		
+		// Apply min/max constraints
+		if (pricingRule.min_price && price < pricingRule.min_price) {
+			price = pricingRule.min_price;
+		}
+		if (pricingRule.max_price && price > pricingRule.max_price) {
+			price = pricingRule.max_price;
+		}
+		
+		estimatedPrice = Math.round(price);
+	} else {
+		// Fallback to default pricing
+		estimatedPrice = Math.max(60, sqft * 0.01);
+	}
+}
 </script>
+
 
 <svelte:head>
   <title>Get a Free Quote | Lawn Care Services</title>
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50 py-12">
-  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8"> 
 
     <!-- Progress Bar -->
     <div class="mb-8">
@@ -358,18 +471,41 @@
         {/if}
 
         <!-- Step 2: Property Details -->
-        {#if currentStep === 2}
+{#if currentStep === 2}
           <div class="space-y-6">
             <div>
               <label for="address" class="block text-sm font-medium text-gray-700">Street Address</label>
-              <input
-                type="text"
-                id="address"
-                bind:value={formData.address}
-                class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                class:border-red-500={errors.address}
-                placeholder="123 Main St"
-              />
+              <div class="relative">
+                <input
+                  type="text"
+                  id="address"
+                  bind:value={formData.address}
+                  oninput={(e) => {
+                    searchAddresses(e.currentTarget.value);
+                    showSuggestions = true;
+                  }}
+                  onfocus={() => showSuggestions = addressSuggestions.length > 0}
+                  onblur={() => setTimeout(() => showSuggestions = false, 200)}
+                  class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                  class:border-red-500={errors.address}
+                  placeholder="123 Main St"
+                  autocomplete="off"
+                />
+                
+                {#if showSuggestions && addressSuggestions.length > 0}
+                  <div class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                    {#each addressSuggestions as suggestion}
+                      <button
+                        type="button"
+                        onclick={() => selectAddress(suggestion)}
+                        class="w-full text-left px-4 py-2 hover:bg-green-50 hover:text-green-800 text-sm border-b border-gray-50 last:border-none"
+                      >
+                        {suggestion}
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
               {#if errors.address}
                 <p class="mt-1 text-sm text-red-600">{errors.address}</p>
               {/if}
@@ -382,13 +518,11 @@
                   type="text"
                   id="city"
                   bind:value={formData.city}
+                  disabled={lookingUpAddress}
                   class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                  class:border-red-500={errors.city}
-                  placeholder="Chicago"
+                  class:bg-gray-100={lookingUpAddress}
+                  placeholder={lookingUpAddress ? "..." : "City"}
                 />
-                {#if errors.city}
-                  <p class="mt-1 text-sm text-red-600">{errors.city}</p>
-                {/if}
               </div>
 
               <div>
@@ -403,12 +537,10 @@
                   class:border-red-500={errors.zipCode || !isValidZip}
                   placeholder="60601"
                 />
-                {#if errors.zipCode}
-                  <p class="mt-1 text-sm text-red-600">{errors.zipCode}</p>
-                {:else if formData.zipCode && !isValidZip}
-                  <p class="mt-1 text-sm text-red-600">We don't currently service this area. Enter your email to be notified when we do!</p>
-                {:else if formData.zipCode && isValidZip}
-                  <p class="mt-1 text-sm text-green-600">✓ We service your area!{formData.state ? ` (${formData.state})` : ''}</p>
+                {#if !isValidZip && formData.zipCode.length === 5}
+                  <p class="mt-2 text-sm text-red-600 font-medium">📍 Area not serviced yet.</p>
+                {:else if errors.zipCode}
+                  <p class="mt-2 text-sm text-red-600">{errors.zipCode}</p>
                 {/if}
               </div>
             </div>
@@ -425,7 +557,7 @@
                   type="text"
                   id="firstName"
                   bind:value={formData.firstName}
-                  class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                  class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder:text-gray-400"
                   class:border-red-500={errors.firstName}
                 />
                 {#if errors.firstName}
@@ -439,7 +571,7 @@
                   type="text"
                   id="lastName"
                   bind:value={formData.lastName}
-                  class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                  class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder:text-gray-400"
                   class:border-red-500={errors.lastName}
                 />
                 {#if errors.lastName}
@@ -454,7 +586,7 @@
                 type="email"
                 id="email"
                 bind:value={formData.email}
-                class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder:text-gray-400"
                 class:border-red-500={errors.email}
                 placeholder="you@example.com"
               />
@@ -469,24 +601,23 @@
                 type="tel"
                 id="phone"
                 bind:value={formData.phone}
-                class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder:text-gray-400"
                 class:border-red-500={errors.phone}
-                placeholder="(555) 123-4567"
+                placeholder="(866) 873-2789"
               />
               {#if errors.phone}
                 <p class="mt-1 text-sm text-red-600">{errors.phone}</p>
               {/if}
             </div>
-          </div>
-        {/if}
-
+          </div> {/if}
+          
         <!-- Step 4: Preferences -->
         {#if currentStep === 4}
           <div class="space-y-6">
             <div>
               <label class="block text-sm font-medium text-gray-700">Service Frequency</label>
-              <div class="mt-2 grid gap-3 sm:grid-cols-3">
-                {#each [{value: 'weekly', label: 'Weekly'}, {value: 'biweekly', label: 'Bi-Weekly'}, {value: 'monthly', label: 'Monthly'}] as freq}
+              <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                {#each [{value: 'weekly', label: 'Weekly'}, {value: 'biweekly', label: 'Bi-Weekly'}] as freq}
                   <button
                     type="button"
                     onclick={() => formData.frequency = freq.value}
@@ -514,7 +645,7 @@
                 id="notes"
                 bind:value={formData.additionalNotes}
                 rows="4"
-                class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder:text-gray-400"
                 placeholder="Any specific concerns, gate codes, or special instructions..."
               ></textarea>
             </div>
@@ -579,13 +710,29 @@
             </button>
           {/if}
         </div>
-      </div>
-    </div>
 
     <!-- Trust Signals -->
     <div class="mt-8 text-center text-sm text-gray-600">
-      <p>🔒 Your information is secure and will never be shared</p>
-      <p class="mt-1">We typically respond within 24 hours</p>
+      <div class="flex items-center justify-center gap-2 text-gray-500">
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          stroke-width="2.5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" 
+          class="w-4 h-4 text-green-600"
+        >
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <p>Your information is secure and will never be shared</p>
+      </div>
+      <p class="mt-2 flex items-center justify-center gap-2">
+        <span class="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+        We typically respond within 24 hours
+      </p>
     </div>
   </div>
 </div>
@@ -641,4 +788,13 @@
     onComplete={handleContractComplete}
     onCancel={handleContractCancel}
   />
-{/if}
+    {/if}
+  </div> 
+</div>
+
+<style>
+  input::placeholder {
+    color: #9ca3af; /* This is Tailwind's gray-400 */
+    opacity: 0.6;   /* Extra lightness if needed */
+  }
+</style>
