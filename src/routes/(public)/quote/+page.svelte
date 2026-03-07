@@ -5,7 +5,6 @@
   import ContractAgreement from '$lib/components/ContractAgreement.svelte';
   import { toast } from 'svelte-sonner';
   import { debounce } from '$lib/utils';
-  import { lookupCookCountyLotSize } from '$lib/lot-size/cook-county-client';
 
   let addressSuggestions = $state<string[]>([]);
   let showSuggestions = $state(false);
@@ -64,31 +63,42 @@
     showSuggestions = false;
     addressSuggestions = [];
     lookingUpAddress = true;
+    estimatedPrice = null;
     formData.city = '';
     formData.zipCode = '';
     try {
-      // Step 1: geocode on server (gets city/state/zip/county)
-      const res = await fetch('/api/lookup-address', {
+      // Step 1: geocode → get lat/lng/county/state
+      const geoRes = await fetch('/api/lookup-address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address })
       });
-      const result = await res.json();
-      if (result.success && result.data) {
-        const info = result.data;
-        formData.address = info.street_address || address.split(',')[0];
-        formData.city    = info.city  || '';
-        formData.state   = info.state || '';
-        formData.zipCode = info.zip   || '';
-        isValidZip = serviceAreas.includes(formData.zipCode);
-        errors = {};
+      const geoResult = await geoRes.json();
 
-        // Step 2: lot size lookup direct from browser (bypasses Netlify network block)
-        if (info.county === 'Cook' && info.state === 'IL' && info.street_address) {
-          const sqft = await lookupCookCountyLotSize(info.street_address);
-          if (sqft) {
-            await calculatePriceFromLotSize(sqft, info.county);
-          }
+      if (!geoResult.success || !geoResult.data) {
+        toast.error('Could not find that address.');
+        return;
+      }
+
+      const info = geoResult.data;
+      formData.address = info.street_address || address.split(',')[0];
+      formData.city    = info.city  || '';
+      formData.state   = info.state || '';
+      formData.zipCode = info.zip   || '';
+      isValidZip = serviceAreas.includes(formData.zipCode);
+      errors = {};
+
+      // Step 2: lot size via Regrid (server-side, no network blocks)
+      if (info.lat && info.lng) {
+        const lotRes = await fetch('/api/lookup-lot-size', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: info.lat, lng: info.lng })
+        });
+        const lotResult = await lotRes.json();
+
+        if (lotResult.lot_size_sqft) {
+          await calculatePrice(lotResult.lot_size_sqft, info.county, info.state);
         }
       }
     } catch (e) {
@@ -212,18 +222,43 @@
   }
   function handleContractCancel() { showContract = false; showQuoteOptions = true; }
 
-  async function calculatePriceFromLotSize(sqft: number, county: string) {
+  /**
+   * Calculate price from lot size.
+   * Priority: admin pricing_rules → sensible per-sqft fallback.
+   * Admin rules ALWAYS win. No fallback can override an admin-set rule.
+   */
+  async function calculatePrice(sqft: number, county: string, state: string) {
     if (!selectedServiceData) return;
-    const { data: rule } = await supabase.from('pricing_rules').select('*')
-      .eq('county', county).eq('state', formData.state)
-      .eq('service_type', selectedServiceData.name).single();
+
+    // Fetch ALL rules for this service — broadest to most specific.
+    // This lets a county-level rule override a state-level rule, etc.
+    const { data: rules } = await supabase
+      .from('pricing_rules')
+      .select('*')
+      .eq('service_type', selectedServiceData.name)
+      .or(`county.eq.${county},county.is.null`)
+      .or(`state.eq.${state},state.is.null`);
+
+    // Pick the most specific matching rule:
+    // exact county+state > county only > state only > global (all null)
+    let rule = null;
+    if (rules && rules.length > 0) {
+      rule =
+        rules.find(r => r.county === county && r.state === state) ??
+        rules.find(r => r.county === county) ??
+        rules.find(r => r.state === state) ??
+        rules.find(r => !r.county && !r.state) ??
+        null;
+    }
+
     if (rule) {
-      let price = sqft * rule.price_per_sqft;
-      if (rule.min_price && price < rule.min_price) price = rule.min_price;
-      if (rule.max_price && price > rule.max_price) price = rule.max_price;
+      let price = sqft * parseFloat(rule.price_per_sqft);
+      if (rule.min_price && price < parseFloat(rule.min_price)) price = parseFloat(rule.min_price);
+      if (rule.max_price && price > parseFloat(rule.max_price)) price = parseFloat(rule.max_price);
       estimatedPrice = Math.round(price);
     } else {
-      estimatedPrice = Math.max(60, Math.round(sqft * 0.01));
+      // No admin rule set — use sensible industry default (~$0.01/sqft, min $65)
+      estimatedPrice = Math.max(65, Math.round(sqft * 0.01));
     }
   }
 </script>
