@@ -27,77 +27,64 @@ import type { RequestHandler } from './$types';
 // ─── Cook County Assessor ────────────────────────────────────────────────────
 
 /**
- * Step 1: use Cook County's parcel centroid dataset to find the PIN
- * for the parcel containing (lat, lng).
+ * Query the Cook County Assessor Parcel Universe dataset (nj4t-kc8j)
+ * directly by lat/lng bounding box — no geospatial functions needed.
  *
- * Endpoint: https://datacatalog.cookcountyil.gov/resource/77tz-riq7.json
- * We query with a geospatial within_circle filter (100m radius).
+ * The dataset has plain numeric `lat` and `lon` columns (parcel centroids)
+ * and a `char_lot` field for lot size in square feet.
+ *
+ * We search a ~150m bounding box (~0.00135 degrees) around the point
+ * and take the nearest result by distance.
  */
-async function getCookCountyPin(lat: number, lng: number): Promise<string | null> {
+async function getCookCountyLotSize(lat: number, lng: number): Promise<number | null> {
   try {
-    // Socrata geospatial query — within_circle(geometry_col, lat, lng, radius_m)
-    const url = new URL('https://datacatalog.cookcountyil.gov/resource/77tz-riq7.json');
-    url.searchParams.set('$where', `within_circle(centroid, ${lat}, ${lng}, 100)`);
-    url.searchParams.set('$limit', '1');
+    const delta = 0.0014; // ~150m in degrees
+    const where = [
+      `lat between ${lat - delta} and ${lat + delta}`,
+      `lon between ${lng - delta} and ${lng + delta}`,
+      `char_lot > 0`
+    ].join(' AND ');
+
+    const url = new URL('https://datacatalog.cookcountyil.gov/resource/nj4t-kc8j.json');
+    url.searchParams.set('$where', where);
+    url.searchParams.set('$select', 'pin,lat,lon,char_lot');
+    url.searchParams.set('$limit', '5');
+    url.searchParams.set('$order', 'tax_year DESC'); // most recent year first
+
+    console.log('[cook-county] querying parcel universe:', url.searchParams.toString());
 
     const res = await fetch(url.toString(), {
       headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(10000)
     });
 
     if (!res.ok) {
-      console.error('[cook-county-pin] HTTP', res.status);
-      return null;
-    }
-
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) return null;
-
-    // The PIN field is called `pin` or `pin10`
-    const pin = data[0]?.pin ?? data[0]?.pin10 ?? null;
-    console.log('[cook-county-pin] found PIN:', pin);
-    return pin ? String(pin) : null;
-  } catch (err) {
-    console.error('[cook-county-pin] error:', err);
-    return null;
-  }
-}
-
-/**
- * Step 2: use the PIN to look up lot size from the Cook County
- * Assessor's parcel characteristics dataset.
- *
- * Endpoint: https://datacatalog.cookcountyil.gov/resource/tx2p-k2g9.json
- * Field: lot_size (sq ft)
- */
-async function getCookCountyLotSize(pin: string): Promise<number | null> {
-  try {
-    const url = new URL('https://datacatalog.cookcountyil.gov/resource/tx2p-k2g9.json');
-    url.searchParams.set('pin', pin);
-    url.searchParams.set('$limit', '1');
-
-    const res = await fetch(url.toString(), {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(8000)
-    });
-
-    if (!res.ok) {
-      console.error('[cook-county-lot] HTTP', res.status);
+      const body = await res.text().catch(() => '');
+      console.error('[cook-county] HTTP', res.status, body.slice(0, 200));
       return null;
     }
 
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) {
-      console.log('[cook-county-lot] no record for PIN', pin);
+      console.log('[cook-county] no parcels found near', lat, lng);
       return null;
     }
 
-    const lot = data[0]?.lot_size ?? data[0]?.sqft ?? null;
-    const sqft = lot ? Math.round(parseFloat(String(lot))) : null;
-    console.log('[cook-county-lot] lot_size:', sqft, 'sqft for PIN', pin);
+    // Pick the closest parcel by Euclidean distance to the query point
+    const closest = data.reduce((best: any, row: any) => {
+      const d = Math.hypot(parseFloat(row.lat) - lat, parseFloat(row.lon) - lng);
+      if (!best || d < best.d) return { row, d };
+      return best;
+    }, null as any);
+
+    const sqft = closest?.row?.char_lot
+      ? Math.round(parseFloat(String(closest.row.char_lot)))
+      : null;
+
+    console.log('[cook-county] lot size:', sqft, 'sqft  PIN:', closest?.row?.pin);
     return sqft && sqft > 0 ? sqft : null;
   } catch (err) {
-    console.error('[cook-county-lot] error:', err);
+    console.error('[cook-county] error:', err);
     return null;
   }
 }
@@ -178,11 +165,8 @@ export const POST: RequestHandler = async ({ request }) => {
     // ── Cook County: use free assessor API ──────────────────────────────────
     if (countyNorm === 'cook' && state === 'IL') {
       console.log('[lookup-lot-size] Cook County path');
-      const pin = await getCookCountyPin(lat, lng);
-      if (pin) {
-        lot_size_sqft = await getCookCountyLotSize(pin);
-        if (lot_size_sqft) source = 'cook_county_assessor';
-      }
+      lot_size_sqft = await getCookCountyLotSize(lat, lng);
+      if (lot_size_sqft) source = 'cook_county_assessor';
     }
 
     // ── All other counties: bounds estimation ────────────────────────────────

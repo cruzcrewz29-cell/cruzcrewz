@@ -697,18 +697,22 @@
             <!-- ── TREE / SHRUB CARE ── -->
             {:else if isTreeCare}
               <!-- Shrub count -->
-              <div>
-                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">How many shrubs / bushes need attention?</label>
-                <div class="flex items-center gap-4">
-                  <button type="button"
-                    onclick={() => treeCareInputs.shrubCount = clamp(treeCareInputs.shrubCount - 1, 0, 50)}
-                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
-                  <span class="w-12 text-center text-2xl font-bold text-gray-900">{treeCareInputs.shrubCount}</span>
-                  <button type="button"
-                    onclick={() => treeCareInputs.shrubCount = clamp(treeCareInputs.shrubCount + 1, 0, 50)}
-                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
-                </div>
-              </div>
+              <div class="flex flex-col items-center"> <label class="block text-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+    How many shrubs / bushes need attention?
+  </label>
+  
+  <div class="flex items-center gap-4">
+    <button type="button"
+      onclick={() => treeCareInputs.shrubCount = clamp(treeCareInputs.shrubCount - 1, 0, 50)}
+      class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+    
+    <span class="w-12 text-center text-2xl font-bold text-gray-900">{treeCareInputs.shrubCount}</span>
+    
+    <button type="button"
+      onclick={() => treeCareInputs.shrubCount = clamp(treeCareInputs.shrubCount + 1, 0, 50)}
+      class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+  </div>
+</div>
 
               <!-- Shrub height -->
               {#if treeCareInputs.shrubCount > 0}
@@ -735,18 +739,22 @@
               {/if}
 
               <!-- Tree count -->
-              <div>
-                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">How many trees need work?</label>
-                <div class="flex items-center gap-4">
-                  <button type="button"
-                    onclick={() => treeCareInputs.treeCount = clamp(treeCareInputs.treeCount - 1, 0, 20)}
-                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
-                  <span class="w-12 text-center text-2xl font-bold text-gray-900">{treeCareInputs.treeCount}</span>
-                  <button type="button"
-                    onclick={() => treeCareInputs.treeCount = clamp(treeCareInputs.treeCount + 1, 0, 20)}
-                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
-                </div>
-              </div>
+              <div class="flex flex-col items-center"> <label class="block text-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+    How many trees need work?
+  </label>
+  
+  <div class="flex items-center gap-4">
+    <button type="button"
+      onclick={() => treeCareInputs.treeCount = clamp(treeCareInputs.treeCount - 1, 0, 20)}
+      class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+    
+    <span class="w-12 text-center text-2xl font-bold text-gray-900">{treeCareInputs.treeCount}</span>
+    
+    <button type="button"
+      onclick={() => treeCareInputs.treeCount = clamp(treeCareInputs.treeCount + 1, 0, 20)}
+      class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+  </div>
+</div>
 
               <!-- Condition -->
               <div>
@@ -849,11 +857,10 @@
 
               <!-- Bed sqft -->
               {#if (isCleanup ? cleanupInputs.bedCount : landscapeInputs.bedCount) > 0}
-                <div>
-                  <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
-                    Approximate total bed area <span class="normal-case font-normal text-gray-400">(optional)</span>
-                  </label>
-                  <div class="flex items-center gap-2">
+               <div class="flex flex-col items-center"> <label class="block text-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+                Approximate total bed area <span class="normal-case font-normal text-gray-400">(optional)</span>
+              </label>
+                      <div class="flex items-center gap-2">
                     {#if isCleanup}
                       <input
                         type="number" min="0" max="5000"

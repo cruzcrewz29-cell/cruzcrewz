@@ -126,9 +126,8 @@ Additional Terms and Conditions
 	}
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
-	<div class="my-8 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-
+<div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4" onclick={onCancel}>
+<div class="my-8 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl" onclick={(e) => e.stopPropagation()}>
 		<!-- Header -->
 		<div class="bg-gradient-to-br from-green-700 to-green-600 px-6 py-5 text-white">
 			<h2 class="text-lg font-bold">Service Agreement</h2>
@@ -275,13 +274,14 @@ Additional Terms and Conditions
 					amount={contractData.totalPrice}
 					jobId={contractData.jobId}
 					onSuccess={handlePaymentSuccess}
-				/>
+					onCancel={onCancel}
+/>
 			</div>
 
 			<div class="border-t border-gray-100 px-6 py-4">
-				<button onclick={() => (step = 2)}
-					class="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-					Back
+			<button onclick={() => (step = 2)}
+				class="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+				Back to signature
 				</button>
 			</div>
 		{/if}
