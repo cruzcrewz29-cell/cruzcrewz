@@ -26,11 +26,14 @@
 		IN: ['Porter', 'Lake']
 	};
 
+	// These MUST match the `name` field in src/lib/data/services.ts exactly.
+	// services.ts names: 'Lawn Mowing', 'Trimming & Edging',
+	//   'Bush, Shrub & Tree Care', 'Spring & Fall Cleanups', 'Landscape Maintenance'
 	const SERVICE_TYPES = [
 		'Lawn Mowing',
 		'Trimming & Edging',
-		'Aeration & Overseeding',
-		'Leaf Removal',
+		'Bush, Shrub & Tree Care',
+		'Spring & Fall Cleanups',
 		'Landscape Maintenance'
 	];
 
@@ -339,7 +342,7 @@
 						placeholder="0.0100"
 						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
 					/>
-					<p class="mt-1 text-xs text-gray-500">Example: 0.01 = $1 per 100 sq ft</p>
+					<p class="mt-1 text-xs text-gray-500">Example: 0.01 = $1 per 100 sq ft · A 6,000 sqft lot at 0.01 = $60</p>
 				</div>
 
 				<div class="grid grid-cols-2 gap-4">

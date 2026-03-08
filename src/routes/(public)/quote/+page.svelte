@@ -5,18 +5,39 @@
   import ContractAgreement from '$lib/components/ContractAgreement.svelte';
   import { toast } from 'svelte-sonner';
   import { debounce } from '$lib/utils';
+  import {
+    YARD_TIERS,
+    calcMowing,
+    calcEdging,
+    calcTreeCare,
+    calcCleanup,
+    calcLandscape,
+    type YardTierId,
+    type ShrubHeight,
+    type TrimCondition,
+    type WorkType,
+    type DebrisLevel,
+    type AdminRule,
+  } from '$lib/pricing/calculator';
 
+  // ── Address / lot lookup state ───────────────────────────────────────────
   let addressSuggestions = $state<string[]>([]);
-  let showSuggestions = $state(false);
-  let lookingUpAddress = $state(false);
+  let showSuggestions    = $state(false);
+  let lookingUpAddress   = $state(false);
+  let lotSizeIsEstimate  = $state(false);
+  let resolvedCounty     = $state('');
+  let resolvedState      = $state('');
+  let resolvedLotSqft    = $state<number | null>(null);
 
-  const zipToState: Record<string, string> = { '46': 'IN', '60': 'IL' };
-  function getStateFromZip(zip: string) {
-    if (!zip || zip.length < 2) return '';
-    return zipToState[zip.substring(0, 2)] || '';
-  }
+  // Lot size fallback
+  let showYardTiers      = $state(false);
+  let selectedYardTier   = $state<YardTierId | null>(null);
+  let manualSqft         = $state('');
+  let showExactSqft      = $state(false);
 
+  // ── Form state ───────────────────────────────────────────────────────────
   let currentStep = $state(1);
+
   let formData = $state({
     selectedService: '',
     address: '',
@@ -29,28 +50,69 @@
     phone: '',
     frequency: 'weekly',
     startDate: '',
-    additionalNotes: ''
+    additionalNotes: '',
   });
 
-  let errors = $state<Record<string, string>>({});
-  let isValidZip = $state(true);
-  let estimatedPrice = $state<number | null>(null);
-  let showContract = $state(false);
-  let showQuoteOptions = $state(false);
-  let contractData = $state<any>(null);
-  let submitting = $state(false);
+  // Step 3 service-specific inputs
+  let treeCareInputs = $state({
+    shrubCount:  0,
+    treeCount:   0,
+    shrubHeight: 'under-4ft' as ShrubHeight,
+    condition:   'maintained' as TrimCondition,
+    workType:    'trim-shape' as WorkType,
+  });
 
+  let cleanupInputs = $state({
+    lotSqft:      0,
+    bedCount:     0,
+    bedSqft:      0,
+    debrisLevel:  'moderate' as DebrisLevel,
+    needsHauling: false,
+  });
+
+  let landscapeInputs = $state({
+    lotSqft:      0,
+    bedCount:     0,
+    bedSqft:      0,
+    debrisLevel:  'moderate' as DebrisLevel,
+    needsHauling: false,
+  });
+
+  let errors     = $state<Record<string, string>>({});
+  let isValidZip = $state(true);
+
+  let estimatedPrice  = $state<number | null>(null);
+  let showContract    = $state(false);
+  let showQuoteOptions = $state(false);
+  let contractData    = $state<any>(null);
+  let submitting      = $state(false);
+
+  // ── Step metadata ────────────────────────────────────────────────────────
   const stepMeta = [
-    { label: 'Service',  heading: 'What service do you need?',      sub: 'Choose from our professional lawn care services.' },
-    { label: 'Property', heading: 'Where is the property?',         sub: 'We\'ll use your address to calculate an accurate price.' },
-    { label: 'Contact',  heading: 'How do we reach you?',           sub: 'We\'ll only contact you to confirm your appointment.' },
-    { label: 'Details',  heading: 'Just a few final details.',      sub: 'Review your quote and choose a start date.' },
+    { label: 'Service', heading: 'What service do you need?',       sub: 'Choose from our professional lawn care services.' },
+    { label: 'Property', heading: 'Where is the property?',          sub: "We'll use your address to calculate an accurate price." },
+    { label: 'Details',  heading: 'Tell us about your property.',    sub: 'A few quick questions so we can price accurately.' },
+    { label: 'Contact',  heading: 'How do we reach you?',            sub: "We'll only contact you to confirm your appointment." },
+    { label: 'Review',   heading: 'Just a few final details.',       sub: 'Review your quote and choose a start date.' },
   ];
 
+  const TOTAL_STEPS = 5;
+
+  // ── Derived ──────────────────────────────────────────────────────────────
+  let selectedServiceData = $derived(services.find(s => s.id === formData.selectedService));
+
+  let isMowing    = $derived(formData.selectedService === 'lawn-mowing');
+  let isEdging    = $derived(formData.selectedService === 'trimming-edging');
+  let isTreeCare  = $derived(formData.selectedService === 'tree-care');
+  let isCleanup   = $derived(formData.selectedService === 'seasonal-cleanup');
+  let isLandscape = $derived(formData.selectedService === 'landscape-maintenance');
+  let isLotBased  = $derived(isMowing || isEdging);
+
+  // ── Address autocomplete ─────────────────────────────────────────────────
   const searchAddresses = debounce(async (query: string) => {
     if (query.length < 3) { addressSuggestions = []; showSuggestions = false; return; }
     try {
-      const res = await fetch(`/api/autocomplete-address?query=${encodeURIComponent(query)}`);
+      const res  = await fetch(`/api/autocomplete-address?query=${encodeURIComponent(query)}`);
       const data = await res.json();
       if (data.predictions) {
         addressSuggestions = data.predictions.map((p: any) => p.description);
@@ -60,23 +122,29 @@
   }, 300);
 
   async function selectAddress(address: string) {
-    showSuggestions = false;
+    showSuggestions    = false;
     addressSuggestions = [];
-    lookingUpAddress = true;
-    estimatedPrice = null;
-    formData.city = '';
-    formData.zipCode = '';
+    lookingUpAddress   = true;
+    estimatedPrice     = null;
+    lotSizeIsEstimate  = false;
+    showYardTiers      = false;
+    selectedYardTier   = null;
+    manualSqft         = '';
+    resolvedLotSqft    = null;
+    formData.city = formData.zipCode = '';
+    resolvedCounty = resolvedState = '';
+
     try {
-      // Step 1: geocode → get lat/lng/county/state
       const geoRes = await fetch('/api/lookup-address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address })
+        body: JSON.stringify({ address }),
       });
       const geoResult = await geoRes.json();
 
       if (!geoResult.success || !geoResult.data) {
         toast.error('Could not find that address.');
+        showYardTiers = isLotBased;
         return;
       }
 
@@ -85,30 +153,125 @@
       formData.city    = info.city  || '';
       formData.state   = info.state || '';
       formData.zipCode = info.zip   || '';
+      resolvedCounty   = info.county || '';
+      resolvedState    = info.state  || '';
       isValidZip = serviceAreas.includes(formData.zipCode);
       errors = {};
 
-      // Step 2: lot size via Regrid (server-side, no network blocks)
       if (info.lat && info.lng) {
         const lotRes = await fetch('/api/lookup-lot-size', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat: info.lat, lng: info.lng })
+          body: JSON.stringify({ lat: info.lat, lng: info.lng, county: info.county, state: info.state }),
         });
         const lotResult = await lotRes.json();
 
         if (lotResult.lot_size_sqft) {
-          await calculatePrice(lotResult.lot_size_sqft, info.county, info.state);
+          resolvedLotSqft   = lotResult.lot_size_sqft;
+          lotSizeIsEstimate = lotResult.is_estimate === true;
+          // Sync into cleanup/landscape inputs
+          cleanupInputs.lotSqft   = lotResult.lot_size_sqft;
+          landscapeInputs.lotSqft = lotResult.lot_size_sqft;
+          // Calculate immediately for lot-based services
+          if (isLotBased) await calculatePriceForMowing(lotResult.lot_size_sqft);
+        } else {
+          if (isLotBased) showYardTiers = true;
         }
+      } else {
+        if (isLotBased) showYardTiers = true;
       }
     } catch (e) {
       console.error('Address lookup failed:', e);
       toast.error('Could not load address details.');
+      if (isLotBased) showYardTiers = true;
     } finally {
       lookingUpAddress = false;
     }
   }
 
+  // ── Lot size fallback helpers ────────────────────────────────────────────
+  async function selectYardTier(tierId: YardTierId) {
+    selectedYardTier = tierId;
+    const tier = YARD_TIERS.find(t => t.id === tierId)!;
+    resolvedLotSqft = tier.sqft;
+    lotSizeIsEstimate = true;
+    cleanupInputs.lotSqft   = tier.sqft;
+    landscapeInputs.lotSqft = tier.sqft;
+    if (isLotBased) await calculatePriceForMowing(tier.sqft);
+  }
+
+  async function applyManualSqft() {
+    const sqft = parseInt(manualSqft.replace(/,/g, ''), 10);
+    if (!sqft || sqft < 500 || sqft > 500000) {
+      toast.error('Please enter a valid lot size (500–500,000 sq ft).');
+      return;
+    }
+    resolvedLotSqft   = sqft;
+    lotSizeIsEstimate = false;
+    selectedYardTier  = null;
+    cleanupInputs.lotSqft   = sqft;
+    landscapeInputs.lotSqft = sqft;
+    if (isLotBased) await calculatePriceForMowing(sqft);
+  }
+
+  // ── Pricing calculations ─────────────────────────────────────────────────
+  async function getAdminRule(): Promise<AdminRule | null> {
+    if (!selectedServiceData) return null;
+    const { data: rules } = await supabase
+      .from('pricing_rules')
+      .select('*')
+      .eq('service_type', selectedServiceData.name)
+      .or(
+        `and(county.eq.${resolvedCounty},state.eq.${resolvedState}),` +
+        `and(county.eq.${resolvedCounty},state.is.null),` +
+        `and(county.is.null,state.eq.${resolvedState}),` +
+        `and(county.is.null,state.is.null)`
+      );
+    if (!rules?.length) return null;
+    return (
+      rules.find(r => r.county === resolvedCounty && r.state === resolvedState) ??
+      rules.find(r => r.county === resolvedCounty && !r.state) ??
+      rules.find(r => !r.county && r.state === resolvedState) ??
+      rules.find(r => !r.county && !r.state) ??
+      null
+    );
+  }
+
+  async function calculatePriceForMowing(sqft: number) {
+    const rule = await getAdminRule();
+    estimatedPrice = isMowing ? calcMowing(sqft, rule) : calcEdging(sqft, rule);
+  }
+
+  function calculatePriceForTreeCare() {
+    if (treeCareInputs.shrubCount === 0 && treeCareInputs.treeCount === 0) {
+      estimatedPrice = null;
+      return;
+    }
+    estimatedPrice = calcTreeCare(treeCareInputs);
+  }
+
+  function calculatePriceForCleanup() {
+    estimatedPrice = calcCleanup(cleanupInputs);
+  }
+
+  function calculatePriceForLandscape() {
+    estimatedPrice = calcLandscape(landscapeInputs);
+  }
+
+  // Reactive recalc when Step 3 inputs change
+  $effect(() => {
+    if (currentStep !== 3) return;
+    if (isTreeCare)  { calculatePriceForTreeCare();  return; }
+    if (isCleanup)   { calculatePriceForCleanup();   return; }
+    if (isLandscape) { calculatePriceForLandscape();  return; }
+  });
+
+  // ── ZIP helper ───────────────────────────────────────────────────────────
+  const zipToState: Record<string, string> = { '46': 'IN', '60': 'IL' };
+  function getStateFromZip(zip: string) {
+    if (!zip || zip.length < 2) return '';
+    return zipToState[zip.substring(0, 2)] || '';
+  }
   $effect(() => {
     if (formData.zipCode.length >= 2) {
       const d = getStateFromZip(formData.zipCode);
@@ -116,6 +279,7 @@
     }
   });
 
+  // Pre-select service from URL
   $effect(() => {
     const sp = $page.url.searchParams.get('service');
     if (sp) {
@@ -124,12 +288,11 @@
     }
   });
 
-  let selectedServiceData = $derived(services.find(s => s.id === formData.selectedService));
-
   function validateZipCode() {
     if (formData.zipCode.length === 5) isValidZip = serviceAreas.includes(formData.zipCode);
   }
 
+  // ── Step validation ──────────────────────────────────────────────────────
   function validateStep(step: number) {
     const e: Record<string, string> = {};
     if (step === 1 && !formData.selectedService) e.selectedService = 'Please select a service';
@@ -141,6 +304,14 @@
       if (formData.zipCode && !isValidZip) e.zipCode = "Sorry, we don't service this area yet";
     }
     if (step === 3) {
+      if (isTreeCare && treeCareInputs.shrubCount === 0 && treeCareInputs.treeCount === 0) {
+        e.treeCount = 'Please enter at least one shrub or tree';
+      }
+      if ((isCleanup || isLandscape) && cleanupInputs.bedCount === 0 && landscapeInputs.bedCount === 0) {
+        // beds are optional — no hard block
+      }
+    }
+    if (step === 4) {
       if (!formData.firstName) e.firstName = 'First name is required';
       if (!formData.lastName)  e.lastName  = 'Last name is required';
       if (!formData.email)     e.email     = 'Email is required';
@@ -156,40 +327,41 @@
   }
   function prevStep() { currentStep--; errors = {}; }
 
+  // ── Quote submit ─────────────────────────────────────────────────────────
   async function submitQuote() {
-    if (!validateStep(4)) return;
+    if (!validateStep(5)) return;
     submitting = true;
     try {
       const fullAddress = `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`;
-      let customerId;
+      let customerId: string;
       const { data: existing } = await supabase.from('customers').select('id').eq('email', formData.email).single();
       if (existing) {
         customerId = existing.id;
       } else {
         const { data: nc, error: ce } = await supabase.from('customers').insert({
           name: `${formData.firstName} ${formData.lastName}`,
-          email: formData.email, phone: formData.phone, address: fullAddress
+          email: formData.email, phone: formData.phone, address: fullAddress,
         }).select().single();
         if (ce) throw ce;
         customerId = nc.id;
       }
       const { data: job, error: je } = await supabase.from('jobs').insert({
-        customer_id: customerId,
-        service_type: selectedServiceData!.name,
-        description: formData.additionalNotes || '',
-        status: 'pending',
+        customer_id:    customerId,
+        service_type:   selectedServiceData!.name,
+        description:    formData.additionalNotes || '',
+        status:         'pending',
         scheduled_date: formData.startDate || new Date().toISOString(),
-        price: estimatedPrice,
-        customer_phone: formData.phone
+        price:          estimatedPrice,
+        customer_phone: formData.phone,
       }).select().single();
       if (je) throw je;
       contractData = {
         jobId: job.id, customerId,
-        customerName: `${formData.firstName} ${formData.lastName}`,
+        customerName:  `${formData.firstName} ${formData.lastName}`,
         customerEmail: formData.email, customerPhone: formData.phone,
-        services: [selectedServiceData!.name],
-        schedule: `${formData.frequency} service starting ${formData.startDate || 'as soon as possible'}`,
-        totalPrice: estimatedPrice || 0
+        services:  [selectedServiceData!.name],
+        schedule:  `${formData.frequency} service starting ${formData.startDate || 'as soon as possible'}`,
+        totalPrice: estimatedPrice || 0,
       };
       showQuoteOptions = true;
     } catch (e) {
@@ -198,23 +370,22 @@
     } finally { submitting = false; }
   }
 
-  function handleSignNow() { showQuoteOptions = false; showContract = true; }
-
+  function handleSignNow()  { showQuoteOptions = false; showContract = true; }
   async function handleSignLater() {
     const res = await fetch('/api/send-quote-email', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         customerEmail: contractData.customerEmail, customerName: contractData.customerName,
         services: contractData.services, schedule: contractData.schedule,
-        totalPrice: contractData.totalPrice, jobId: contractData.jobId
-      })
+        totalPrice: contractData.totalPrice, jobId: contractData.jobId,
+      }),
     });
     showQuoteOptions = false;
-    if (res.ok) toast.success('Quote saved! Check your email for the contract signing link.');
-    else toast.error('Quote saved, but email failed to send. Please contact us directly.');
+    toast[res.ok ? 'success' : 'error'](
+      res.ok ? 'Quote saved! Check your email for the contract link.' : 'Quote saved but email failed. Contact us directly.'
+    );
     setTimeout(() => { window.location.href = '/'; }, 2000);
   }
-
   function handleContractComplete() {
     showContract = false;
     toast.success("Thank you! Your service agreement has been signed. We'll contact you shortly.");
@@ -222,44 +393,9 @@
   }
   function handleContractCancel() { showContract = false; showQuoteOptions = true; }
 
-  /**
-   * Calculate price from lot size.
-   * Priority: admin pricing_rules → sensible per-sqft fallback.
-   * Admin rules ALWAYS win. No fallback can override an admin-set rule.
-   */
-  async function calculatePrice(sqft: number, county: string, state: string) {
-    if (!selectedServiceData) return;
-
-    // Fetch ALL rules for this service — broadest to most specific.
-    // This lets a county-level rule override a state-level rule, etc.
-    const { data: rules } = await supabase
-      .from('pricing_rules')
-      .select('*')
-      .eq('service_type', selectedServiceData.name)
-      .or(`county.eq.${county},county.is.null`)
-      .or(`state.eq.${state},state.is.null`);
-
-    // Pick the most specific matching rule:
-    // exact county+state > county only > state only > global (all null)
-    let rule = null;
-    if (rules && rules.length > 0) {
-      rule =
-        rules.find(r => r.county === county && r.state === state) ??
-        rules.find(r => r.county === county) ??
-        rules.find(r => r.state === state) ??
-        rules.find(r => !r.county && !r.state) ??
-        null;
-    }
-
-    if (rule) {
-      let price = sqft * parseFloat(rule.price_per_sqft);
-      if (rule.min_price && price < parseFloat(rule.min_price)) price = parseFloat(rule.min_price);
-      if (rule.max_price && price > parseFloat(rule.max_price)) price = parseFloat(rule.max_price);
-      estimatedPrice = Math.round(price);
-    } else {
-      // No admin rule set — use sensible industry default (~$0.01/sqft, min $65)
-      estimatedPrice = Math.max(65, Math.round(sqft * 0.01));
-    }
+  // ── Counter helper ───────────────────────────────────────────────────────
+  function clamp(val: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, val));
   }
 </script>
 
@@ -270,14 +406,14 @@
 <div class="min-h-screen bg-gray-50 py-10 sm:py-14">
   <div class="mx-auto max-w-2xl px-4 sm:px-6">
 
-    <!-- Progress Stepper -->
+    <!-- ── Progress Stepper ── -->
     <div class="mb-8">
       <div class="flex items-center justify-between">
         {#each stepMeta as step, i}
           {@const num = i + 1}
-          {@const done = currentStep > num}
+          {@const done   = currentStep > num}
           {@const active = currentStep === num}
-          <div class="flex items-center {num !== 4 ? 'flex-1' : ''}">
+          <div class="flex items-center {num !== TOTAL_STEPS ? 'flex-1' : ''}">
             <div class="flex flex-col items-center">
               <div class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-all duration-300
                 {done   ? 'bg-green-600 text-white' :
@@ -287,15 +423,13 @@
                   <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                   </svg>
-                {:else}
-                  {num}
-                {/if}
+                {:else}{num}{/if}
               </div>
               <span class="mt-1.5 text-xs font-medium {active ? 'text-green-700' : 'text-gray-400'}">
                 {step.label}
               </span>
             </div>
-            {#if num !== 4}
+            {#if num !== TOTAL_STEPS}
               <div class="mx-2 mb-5 h-0.5 flex-1 transition-all duration-500
                 {currentStep > num ? 'bg-green-500' : 'bg-gray-200'}"></div>
             {/if}
@@ -304,31 +438,29 @@
       </div>
     </div>
 
-    <!-- Card -->
+    <!-- ── Card ── -->
     <div class="overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-100">
 
-      <!-- Dynamic Header -->
+      <!-- Header -->
       <div class="relative overflow-hidden bg-gradient-to-br from-green-700 via-green-600 to-green-500 px-6 py-7 text-white">
-        <!-- Decorative circle -->
         <div class="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10"></div>
         <div class="absolute -bottom-6 right-16 h-20 w-20 rounded-full bg-white/5"></div>
         <div class="relative">
           <div class="mb-1 text-xs font-semibold uppercase tracking-widest text-green-200">
-            Step {currentStep} of 4
+            Step {currentStep} of {TOTAL_STEPS}
           </div>
           <h1 class="text-2xl font-bold leading-tight sm:text-3xl">
             {stepMeta[currentStep - 1].heading}
           </h1>
-          <p class="mt-1.5 text-sm text-green-100">
-            {stepMeta[currentStep - 1].sub}
-          </p>
+          <p class="mt-1.5 text-sm text-green-100">{stepMeta[currentStep - 1].sub}</p>
         </div>
       </div>
 
-      <!-- Step Content -->
       <div class="p-6 sm:p-8">
 
-        <!-- ── Step 1: Service Selection ── -->
+        <!-- ══════════════════════════════════════════════════════════════════
+             STEP 1 — Service Selection
+        ══════════════════════════════════════════════════════════════════ -->
         {#if currentStep === 1}
           <div class="space-y-3">
             {#each services as service}
@@ -345,15 +477,15 @@
                     ? 'bg-green-600 text-white'
                     : 'bg-white text-gray-400 group-hover:bg-green-50 group-hover:text-green-600 shadow-sm'}">
                   {#if service.id === 'lawn-mowing'}
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
                   {:else if service.id === 'trimming-edging'}
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
                   {:else if service.id === 'tree-care'}
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14c.69-.36 1-.72 1-1.19C18 11.25 16.5 10 15 10c0-2.21-1.79-4-4-4S7 7.79 7 10c-1.5 0-3 1.25-3 2.81 0 .47.31.83 1 1.19"/><line x1="12" y1="22" x2="12" y2="14"/><path d="M9 18l3-3 3 3"/></svg>
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14c.69-.36 1-.72 1-1.19C18 11.25 16.5 10 15 10c0-2.21-1.79-4-4-4S7 7.79 7 10c-1.5 0-3 1.25-3 2.81 0 .47.31.83 1 1.19"/><line x1="12" y1="22" x2="12" y2="14"/><path d="M9 18l3-3 3 3"/></svg>
                   {:else if service.id === 'seasonal-cleanup'}
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M5 20V8l7-6 7 6v12"/><path d="M9 20v-5h6v5"/></svg>
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-6 7 6v12"/><path d="M9 20v-5h6v5"/></svg>
                   {:else if service.id === 'landscape-maintenance'}
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                   {/if}
                 </div>
                 <div class="flex-1 min-w-0">
@@ -378,24 +510,20 @@
             {#if errors.selectedService}
               <p class="text-sm text-red-600">{errors.selectedService}</p>
             {/if}
-            <p class="pt-1 text-center text-xs text-gray-400">
-              Pricing is calculated from your property's lot size once you enter your address.
-            </p>
           </div>
-        {/if}
 
-        <!-- ── Step 2: Property Details ── -->
-        {#if currentStep === 2}
+        <!-- ══════════════════════════════════════════════════════════════════
+             STEP 2 — Property / Address
+        ══════════════════════════════════════════════════════════════════ -->
+        {:else if currentStep === 2}
           <div class="space-y-5">
 
-            <!-- Address with search icon -->
+            <!-- Address input -->
             <div>
               <label for="address" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Street Address</label>
               <div class="relative">
                 <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                  <svg class="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-                  </svg>
+                  <svg class="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                 </div>
                 <input
                   type="text" id="address"
@@ -439,10 +567,8 @@
               <div>
                 <label for="city" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">City</label>
                 <input
-                  type="text" id="city"
-                  bind:value={formData.city}
-                  disabled={lookingUpAddress}
-                  class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:opacity-60 transition-all"
+                  type="text" id="city" bind:value={formData.city} disabled={lookingUpAddress}
+                  class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 disabled:opacity-60 transition-all"
                   placeholder={lookingUpAddress ? 'Looking up...' : 'City'}
                 />
                 {#if errors.city}<p class="mt-1 text-xs text-red-500">{errors.city}</p>{/if}
@@ -450,32 +576,31 @@
               <div>
                 <label for="zipCode" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">ZIP Code</label>
                 <input
-                  type="text" id="zipCode"
-                  bind:value={formData.zipCode}
-                  onblur={validateZipCode}
-                  maxlength="5"
-                  class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
+                  type="text" id="zipCode" bind:value={formData.zipCode} onblur={validateZipCode} maxlength="5"
+                  class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
                   class:border-red-400={errors.zipCode || !isValidZip}
                   placeholder="60601"
                 />
                 {#if !isValidZip && formData.zipCode.length === 5}
-                  <p class="mt-1 text-xs text-red-500 font-medium">📍 We don't service this area yet.</p>
+                  <p class="mt-1 text-xs text-red-500 font-medium">We don't service this area yet.</p>
                 {:else if errors.zipCode}
                   <p class="mt-1 text-xs text-red-500">{errors.zipCode}</p>
                 {/if}
               </div>
             </div>
 
-            <!-- Price result -->
+            <!-- Loading -->
             {#if lookingUpAddress}
               <div class="flex items-center gap-3 rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
                 <svg class="h-4 w-4 shrink-0 animate-spin text-green-500" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                 </svg>
-                Calculating your property price...
+                Looking up your property...
               </div>
-            {:else if estimatedPrice}
+
+            <!-- Lot-based services: price shown here -->
+            {:else if isLotBased && estimatedPrice && !showYardTiers}
               <div class="rounded-xl bg-green-600 p-4 text-white">
                 <div class="flex items-center justify-between">
                   <div>
@@ -488,94 +613,372 @@
                     </svg>
                   </div>
                 </div>
-                <p class="mt-2 text-xs text-green-200">Based on your lot size · Final price may vary slightly</p>
+                <p class="mt-2 text-xs text-green-200">
+                  {lotSizeIsEstimate ? 'Based on estimated lot size · ' : ''}Final price may vary slightly
+                </p>
+              </div>
+
+            <!-- Lot size fallback: tier selector + exact entry -->
+            {:else if isLotBased && showYardTiers}
+              <div class="space-y-3">
+                <p class="text-sm font-semibold text-gray-700">Select your yard size for an instant price:</p>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {#each YARD_TIERS as tier}
+                    <button
+                      type="button"
+                      onclick={() => selectYardTier(tier.id)}
+                      class="flex flex-col items-center rounded-xl border-2 p-3 text-center transition-all
+                        {selectedYardTier === tier.id
+                          ? 'border-green-600 bg-green-50'
+                          : 'border-gray-200 bg-gray-50 hover:border-green-300'}"
+                    >
+                      <span class="text-lg font-bold text-green-700">{tier.label}</span>
+                      <span class="mt-0.5 text-xs text-gray-500">{tier.sublabel}</span>
+                    </button>
+                  {/each}
+                </div>
+
+                {#if estimatedPrice && selectedYardTier}
+                  <div class="rounded-xl bg-green-600 p-3 text-white flex items-center justify-between">
+                    <span class="text-sm font-medium text-green-100">Estimated price</span>
+                    <span class="text-2xl font-extrabold">${estimatedPrice}</span>
+                  </div>
+                {/if}
+
+                <!-- Exact sqft toggle -->
+                <button
+                  type="button"
+                  onclick={() => showExactSqft = !showExactSqft}
+                  class="text-xs text-green-700 underline underline-offset-2"
+                >
+                  {showExactSqft ? 'Hide exact entry' : 'Enter exact square footage instead'}
+                </button>
+                {#if showExactSqft}
+                  <div class="flex gap-2">
+                    <input
+                      type="text" bind:value={manualSqft} placeholder="e.g. 6500"
+                      class="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                    />
+                    <span class="flex items-center text-xs font-medium text-gray-500">sq ft</span>
+                    <button
+                      type="button" onclick={applyManualSqft}
+                      class="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                {/if}
+              </div>
+
+            <!-- Non-lot services: just confirm address is set -->
+            {:else if !isLotBased && formData.address}
+              <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                We'll calculate your price in the next step based on your property details.
               </div>
             {/if}
           </div>
-        {/if}
 
-        <!-- ── Step 3: Contact Info ── -->
-        {#if currentStep === 3}
+        <!-- ══════════════════════════════════════════════════════════════════
+             STEP 3 — Service-specific Details
+        ══════════════════════════════════════════════════════════════════ -->
+        {:else if currentStep === 3}
+          <div class="space-y-6">
+
+            <!-- ── MOWING / EDGING: nothing extra needed ── -->
+            {#if isLotBased}
+              <div class="rounded-xl border border-green-200 bg-green-50 p-5 text-center">
+                <p class="text-sm font-semibold text-green-800">Your price is already calculated.</p>
+                <p class="mt-1 text-xs text-green-600">Lot size is all we need for mowing and edging. Continue to the next step.</p>
+                {#if estimatedPrice}
+                  <p class="mt-3 text-3xl font-extrabold text-green-700">${estimatedPrice}</p>
+                {/if}
+              </div>
+
+            <!-- ── TREE / SHRUB CARE ── -->
+            {:else if isTreeCare}
+              <!-- Shrub count -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">How many shrubs / bushes need attention?</label>
+                <div class="flex items-center gap-4">
+                  <button type="button"
+                    onclick={() => treeCareInputs.shrubCount = clamp(treeCareInputs.shrubCount - 1, 0, 50)}
+                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+                  <span class="w-12 text-center text-2xl font-bold text-gray-900">{treeCareInputs.shrubCount}</span>
+                  <button type="button"
+                    onclick={() => treeCareInputs.shrubCount = clamp(treeCareInputs.shrubCount + 1, 0, 50)}
+                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+                </div>
+              </div>
+
+              <!-- Shrub height -->
+              {#if treeCareInputs.shrubCount > 0}
+                <div>
+                  <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Approximate shrub height</label>
+                  <div class="grid grid-cols-3 gap-3">
+                    {#each [
+                      { id: 'under-4ft', label: 'Under 4 ft', sub: 'Low hedges, ground cover' },
+                      { id: '4-8ft',     label: '4 – 8 ft',   sub: 'Standard shrubs' },
+                      { id: 'over-8ft',  label: 'Over 8 ft',  sub: 'Large hedges / tall shrubs' },
+                    ] as h}
+                      <button type="button"
+                        onclick={() => treeCareInputs.shrubHeight = h.id as ShrubHeight}
+                        class="rounded-xl border-2 p-3 text-center transition-all
+                          {treeCareInputs.shrubHeight === h.id
+                            ? 'border-green-600 bg-green-50'
+                            : 'border-gray-200 bg-gray-50 hover:border-green-300'}">
+                        <span class="block text-sm font-semibold text-gray-900">{h.label}</span>
+                        <span class="block mt-0.5 text-xs text-gray-500">{h.sub}</span>
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+
+              <!-- Tree count -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">How many trees need work?</label>
+                <div class="flex items-center gap-4">
+                  <button type="button"
+                    onclick={() => treeCareInputs.treeCount = clamp(treeCareInputs.treeCount - 1, 0, 20)}
+                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+                  <span class="w-12 text-center text-2xl font-bold text-gray-900">{treeCareInputs.treeCount}</span>
+                  <button type="button"
+                    onclick={() => treeCareInputs.treeCount = clamp(treeCareInputs.treeCount + 1, 0, 20)}
+                    class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+                </div>
+              </div>
+
+              <!-- Condition -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">When were they last trimmed?</label>
+                <div class="grid grid-cols-2 gap-3">
+                  {#each [
+                    { id: 'maintained', label: 'Recently maintained', sub: 'Within the last season' },
+                    { id: 'overgrown',  label: 'Overgrown',           sub: 'Not trimmed in 1+ years' },
+                  ] as c}
+                    <button type="button"
+                      onclick={() => treeCareInputs.condition = c.id as TrimCondition}
+                      class="rounded-xl border-2 p-3 text-center transition-all
+                        {treeCareInputs.condition === c.id
+                          ? 'border-green-600 bg-green-50'
+                          : 'border-gray-200 bg-gray-50 hover:border-green-300'}">
+                      <span class="block text-sm font-semibold text-gray-900">{c.label}</span>
+                      <span class="block mt-0.5 text-xs text-gray-500">{c.sub}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <!-- Work type -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Type of work</label>
+                <div class="grid grid-cols-2 gap-3">
+                  {#each [
+                    { id: 'trim-shape', label: 'Trim & Shape',  sub: 'Clean up and shape existing plants' },
+                    { id: 'removal',    label: 'Removal',        sub: 'Remove shrubs or trees entirely' },
+                  ] as w}
+                    <button type="button"
+                      onclick={() => treeCareInputs.workType = w.id as WorkType}
+                      class="rounded-xl border-2 p-3 text-center transition-all
+                        {treeCareInputs.workType === w.id
+                          ? 'border-green-600 bg-green-50'
+                          : 'border-gray-200 bg-gray-50 hover:border-green-300'}">
+                      <span class="block text-sm font-semibold text-gray-900">{w.label}</span>
+                      <span class="block mt-0.5 text-xs text-gray-500">{w.sub}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              {#if errors.treeCount}
+                <p class="text-sm text-red-600">{errors.treeCount}</p>
+              {/if}
+
+            <!-- ── CLEANUP / LANDSCAPE MAINTENANCE ── -->
+            {:else if isCleanup || isLandscape}
+
+              <!-- Debris level -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">How much debris / leaf coverage?</label>
+                <div class="grid grid-cols-3 gap-3">
+                  {#each [
+                    { id: 'light',    label: 'Light',    sub: 'Sparse leaves, tidy property' },
+                    { id: 'moderate', label: 'Moderate', sub: 'Average seasonal buildup' },
+                    { id: 'heavy',    label: 'Heavy',    sub: 'Thick layer, dense coverage' },
+                  ] as d}
+                    <button type="button"
+                      onclick={() => {
+                        if (isCleanup) cleanupInputs.debrisLevel = d.id as DebrisLevel;
+                        else landscapeInputs.debrisLevel = d.id as DebrisLevel;
+                      }}
+                      class="rounded-xl border-2 p-3 text-center transition-all
+                        {(isCleanup ? cleanupInputs : landscapeInputs).debrisLevel === d.id
+                          ? 'border-green-600 bg-green-50'
+                          : 'border-gray-200 bg-gray-50 hover:border-green-300'}">
+                      <span class="block text-sm font-semibold text-gray-900">{d.label}</span>
+                      <span class="block mt-0.5 text-xs text-gray-500">{d.sub}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <!-- Bed count -->
+              <div class="text-center">
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Number of garden / flower beds</label>
+                <div class="flex items-center justify-center gap-5">
+                  <button type="button"
+                    onclick={() => {
+                      if (isCleanup) cleanupInputs.bedCount = clamp(cleanupInputs.bedCount - 1, 0, 20);
+                      else landscapeInputs.bedCount = clamp(landscapeInputs.bedCount - 1, 0, 20);
+                    }}
+                    class="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+                  <div class="flex flex-col items-center">
+                    <span class="text-4xl font-bold text-gray-900 w-16 text-center">
+                      {isCleanup ? cleanupInputs.bedCount : landscapeInputs.bedCount}
+                    </span>
+                    <span class="text-xs text-gray-400 mt-0.5">beds</span>
+                  </div>
+                  <button type="button"
+                    onclick={() => {
+                      if (isCleanup) cleanupInputs.bedCount = clamp(cleanupInputs.bedCount + 1, 0, 20);
+                      else landscapeInputs.bedCount = clamp(landscapeInputs.bedCount + 1, 0, 20);
+                    }}
+                    class="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+                </div>
+              </div>
+
+              <!-- Bed sqft -->
+              {#if (isCleanup ? cleanupInputs.bedCount : landscapeInputs.bedCount) > 0}
+                <div>
+                  <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+                    Approximate total bed area <span class="normal-case font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <div class="flex items-center gap-2">
+                    {#if isCleanup}
+                      <input
+                        type="number" min="0" max="5000"
+                        bind:value={cleanupInputs.bedSqft}
+                        placeholder="e.g. 200"
+                        class="w-40 rounded-xl border border-gray-200 bg-gray-50 py-2.5 px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                      />
+                    {:else}
+                      <input
+                        type="number" min="0" max="5000"
+                        bind:value={landscapeInputs.bedSqft}
+                        placeholder="e.g. 200"
+                        class="w-40 rounded-xl border border-gray-200 bg-gray-50 py-2.5 px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                      />
+                    {/if}
+                    <span class="text-sm text-gray-500">sq ft total</span>
+                  </div>
+                </div>
+              {/if}
+
+              <!-- Hauling -->
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Debris removal / hauling needed?</label>
+                <div class="grid grid-cols-2 gap-3">
+                  {#each [
+                    { val: false, label: 'No — leave on site', sub: 'Bagged for regular trash pickup' },
+                    { val: true,  label: 'Yes — haul away',    sub: 'We remove everything (+$45–60)' },
+                  ] as h}
+                    <button type="button"
+                      onclick={() => {
+                        if (isCleanup) cleanupInputs.needsHauling = h.val;
+                        else landscapeInputs.needsHauling = h.val;
+                      }}
+                      class="rounded-xl border-2 p-3 text-center transition-all
+                        {(isCleanup ? cleanupInputs : landscapeInputs).needsHauling === h.val
+                          ? 'border-green-600 bg-green-50'
+                          : 'border-gray-200 bg-gray-50 hover:border-green-300'}">
+                      <span class="block text-sm font-semibold text-gray-900">{h.label}</span>
+                      <span class="block mt-0.5 text-xs text-gray-500">{h.sub}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            <!-- Live price preview (non-lot services) -->
+            {#if !isLotBased && estimatedPrice}
+              <div class="rounded-xl bg-green-600 p-4 text-white">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-green-200">Your Estimated Price</p>
+                    <p class="mt-0.5 text-3xl font-bold">${estimatedPrice}</p>
+                  </div>
+                  <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                </div>
+                <p class="mt-2 text-xs text-green-200">Updates as you adjust details · Final price may vary slightly</p>
+              </div>
+            {/if}
+          </div>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             STEP 4 — Contact Info
+        ══════════════════════════════════════════════════════════════════ -->
+        {:else if currentStep === 4}
           <div class="space-y-5">
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
                 <label for="firstName" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">First Name</label>
-                <input
-                  type="text" id="firstName"
-                  bind:value={formData.firstName}
+                <input type="text" id="firstName" bind:value={formData.firstName}
                   class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                  class:border-red-400={errors.firstName}
-                  placeholder="Jane"
-                />
+                  class:border-red-400={errors.firstName} placeholder="Jane"/>
                 {#if errors.firstName}<p class="mt-1 text-xs text-red-500">{errors.firstName}</p>{/if}
               </div>
               <div>
                 <label for="lastName" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Last Name</label>
-                <input
-                  type="text" id="lastName"
-                  bind:value={formData.lastName}
+                <input type="text" id="lastName" bind:value={formData.lastName}
                   class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                  class:border-red-400={errors.lastName}
-                  placeholder="Smith"
-                />
+                  class:border-red-400={errors.lastName} placeholder="Smith"/>
                 {#if errors.lastName}<p class="mt-1 text-xs text-red-500">{errors.lastName}</p>{/if}
               </div>
             </div>
-
             <div>
               <label for="email" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Email</label>
               <div class="relative">
                 <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                  <svg class="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  <svg class="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                 </div>
-                <input
-                  type="email" id="email"
-                  bind:value={formData.email}
+                <input type="email" id="email" bind:value={formData.email}
                   class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-9 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                  class:border-red-400={errors.email}
-                  placeholder="jane@example.com"
-                />
+                  class:border-red-400={errors.email} placeholder="jane@example.com"/>
               </div>
               {#if errors.email}<p class="mt-1 text-xs text-red-500">{errors.email}</p>{/if}
             </div>
-
             <div>
               <label for="phone" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Phone</label>
               <div class="relative">
                 <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                  <svg class="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  <svg class="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                 </div>
-                <input
-                  type="tel" id="phone"
-                  bind:value={formData.phone}
+                <input type="tel" id="phone" bind:value={formData.phone}
                   class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-9 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-                  class:border-red-400={errors.phone}
-                  placeholder="(312) 555-0100"
-                />
+                  class:border-red-400={errors.phone} placeholder="(312) 555-0100"/>
               </div>
               {#if errors.phone}<p class="mt-1 text-xs text-red-500">{errors.phone}</p>{/if}
               <p class="mt-1.5 text-xs text-gray-400">We'll only call to confirm your appointment.</p>
             </div>
           </div>
-        {/if}
 
-        <!-- ── Step 4: Preferences + Summary ── -->
-        {#if currentStep === 4}
+        <!-- ══════════════════════════════════════════════════════════════════
+             STEP 5 — Review & Preferences
+        ══════════════════════════════════════════════════════════════════ -->
+        {:else if currentStep === 5}
           <div class="space-y-6">
-
-            <!-- Frequency pill toggle -->
+            <!-- Frequency -->
             <div>
               <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Service Frequency</label>
               <div class="flex rounded-xl bg-gray-100 p-1">
                 {#each [{value: 'weekly', label: 'Weekly'}, {value: 'biweekly', label: 'Bi-Weekly'}] as freq}
-                  <button
-                    type="button"
-                    onclick={() => formData.frequency = freq.value}
+                  <button type="button" onclick={() => formData.frequency = freq.value}
                     class="flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200
-                      {formData.frequency === freq.value
-                        ? 'bg-white text-green-700 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700'}"
-                  >
+                      {formData.frequency === freq.value ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">
                     {freq.label}
                   </button>
                 {/each}
@@ -585,11 +988,8 @@
             <!-- Start date -->
             <div>
               <label for="startDate" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Preferred Start Date</label>
-              <input
-                type="date" id="startDate"
-                bind:value={formData.startDate}
-                class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"
-              />
+              <input type="date" id="startDate" bind:value={formData.startDate}
+                class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all"/>
             </div>
 
             <!-- Notes -->
@@ -597,16 +997,12 @@
               <label for="notes" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
                 Additional Notes <span class="normal-case font-normal text-gray-400">(optional)</span>
               </label>
-              <textarea
-                id="notes"
-                bind:value={formData.additionalNotes}
-                rows="3"
+              <textarea id="notes" bind:value={formData.additionalNotes} rows="3"
                 class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all resize-none"
-                placeholder="Gate codes, special instructions, or anything else we should know..."
-              ></textarea>
+                placeholder="Gate codes, special instructions, or anything else we should know..."></textarea>
             </div>
 
-            <!-- Summary card -->
+            <!-- Summary -->
             <div class="overflow-hidden rounded-xl border border-gray-100 shadow-sm">
               <div class="bg-gray-900 px-5 py-3">
                 <h3 class="text-sm font-semibold text-white">Quote Summary</h3>
@@ -643,43 +1039,27 @@
         <!-- Navigation -->
         <div class="mt-8 flex items-center justify-between">
           {#if currentStep > 1}
-            <button
-              type="button"
-              onclick={prevStep}
-              class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-600 shadow-sm hover:bg-gray-50 transition-colors"
-            >
-              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
-              </svg>
+            <button type="button" onclick={prevStep}
+              class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-600 shadow-sm hover:bg-gray-50 transition-colors">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
               Back
             </button>
           {:else}
             <div></div>
           {/if}
 
-          {#if currentStep < 4}
-            <button
-              type="button"
-              onclick={nextStep}
-              class="flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 transition-colors"
-            >
+          {#if currentStep < TOTAL_STEPS}
+            <button type="button" onclick={nextStep}
+              class="flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 transition-colors">
               Continue
-              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-              </svg>
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             </button>
           {:else}
-            <button
-              type="button"
-              onclick={submitQuote}
-              disabled={submitting}
-              class="flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
+            <button type="button" onclick={submitQuote} disabled={submitting}
+              class="flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
               {submitting ? 'Processing...' : 'Get My Quote'}
               {#if !submitting}
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                </svg>
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
               {/if}
             </button>
           {/if}
@@ -687,24 +1067,18 @@
       </div>
     </div>
 
-    <!-- Trust signals — once, outside the card -->
+    <!-- Trust signals -->
     <div class="mt-6 flex items-center justify-center gap-6 text-xs text-gray-400">
       <span class="flex items-center gap-1.5">
-        <svg class="h-3.5 w-3.5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
+        <svg class="h-3.5 w-3.5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         Secure & private
       </span>
       <span class="flex items-center gap-1.5">
-        <svg class="h-3.5 w-3.5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
+        <svg class="h-3.5 w-3.5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Responds within 24 hrs
       </span>
       <span class="flex items-center gap-1.5">
-        <svg class="h-3.5 w-3.5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
+        <svg class="h-3.5 w-3.5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         No commitment required
       </span>
     </div>

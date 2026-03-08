@@ -21,13 +21,14 @@
 		onCancel: () => void;
 	}>();
 
-	let step = $state(1); // 1: Review, 2: Sign, 3: SMS Verify, 4: Payment
+	// 3 steps: 1 = Review terms, 2 = Sign, 3 = Payment
+	let step = $state(1);
 	let termsAccepted = $state(false);
 	let signatureData = $state('');
-	let smsCode = $state('');
-	let sentCode = $state('');
 	let location = $state<{ lat: number; lng: number } | null>(null);
 	let submitting = $state(false);
+
+	const STEP_LABELS = ['Review', 'Sign', 'Payment'];
 
 	const CONTRACT_TERMS = `
 Additional Terms and Conditions
@@ -51,50 +52,18 @@ Additional Terms and Conditions
 9. Payment Terms: Payment is due upon receipt of the invoice unless otherwise agreed. Late payments exceeding 15 days will incur a late fee. The Service Provider may pause all scheduled services until the account is brought current.
 	`.trim();
 
-	function getLocation() {
+	// Grab location silently — used for contract audit trail
+	$effect(() => {
 		if (navigator.geolocation) {
 			navigator.geolocation.getCurrentPosition(
-				(position) => {
-					location = {
-						lat: position.coords.latitude,
-						lng: position.coords.longitude
-					};
-				},
-				(error) => {
-					console.log('Location access denied:', error);
-				}
+				(pos) => { location = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
+				() => {} // silently ignore — not required
 			);
 		}
-	}
+	});
 
-	function handleSignatureSave(data: string) {
-		signatureData = data;
-	}
-
-	function handleSignatureClear() {
-		signatureData = '';
-	}
-
-	async function sendSMSVerification() {
-		sentCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-		console.log('SMS Code:', sentCode, 'to', contractData.customerPhone);
-
-		toast.info(`Verification code: ${sentCode}`, {
-			description: 'In production, this will be sent via SMS',
-			duration: 8000
-		});
-
-		step = 3;
-	}
-
-	function verifySMSCode() {
-		if (smsCode === sentCode) {
-			step = 4; // Go to payment step
-		} else {
-			toast.error('Invalid verification code. Please try again.');
-		}
-	}
+	function handleSignatureSave(data: string)  { signatureData = data; }
+	function handleSignatureClear()              { signatureData = ''; }
 
 	async function handlePaymentSuccess() {
 		await finalizeContract();
@@ -102,246 +71,203 @@ Additional Terms and Conditions
 
 	async function finalizeContract() {
 		submitting = true;
-
 		try {
-			// Save contract to database
-			const { data: contract, error: contractError } = await supabase
+			// Save contract record
+			const { error: contractError } = await supabase
 				.from('contracts')
 				.insert({
-					job_id: contractData.jobId,
-					customer_id: contractData.customerId,
+					job_id:           contractData.jobId,
+					customer_id:      contractData.customerId,
 					services_provided: contractData.services.join(', '),
-					schedule: contractData.schedule,
-					terms_accepted: termsAccepted,
-					signature_data: signatureData,
+					schedule:         contractData.schedule,
+					terms_accepted:   termsAccepted,
+					signature_data:   signatureData,
 					signing_location: location ? `${location.lat},${location.lng}` : null
-				})
-				.select()
-				.single();
+				});
 
 			if (contractError) throw contractError;
 
-			// Update job with contract info
+			// Update job status
 			const { error: jobError } = await supabase
 				.from('jobs')
 				.update({
-					contract_signed_at: new Date().toISOString(),
-					contract_signature_data: signatureData,
-					signing_location: location ? `${location.lat},${location.lng}` : null,
-					customer_phone: contractData.customerPhone,
-					sms_verified: true,
-					status: 'scheduled'
+					contract_signed_at:       new Date().toISOString(),
+					contract_signature_data:  signatureData,
+					signing_location:         location ? `${location.lat},${location.lng}` : null,
+					customer_phone:           contractData.customerPhone,
+					sms_verified:             true,
+					status:                   'scheduled'
 				})
 				.eq('id', contractData.jobId);
 
 			if (jobError) throw jobError;
 
-			// Send confirmation email
-			await fetch('/api/send-contract-confirmation', {
+			// Send confirmation email — fire and forget, don't block completion
+			fetch('/api/send-contract-confirmation', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					customerEmail: contractData.customerEmail,
-					customerName: contractData.customerName,
-					services: contractData.services,
-					schedule: contractData.schedule,
-					totalPrice: contractData.totalPrice,
-					signedAt: new Date().toISOString()
+					customerName:  contractData.customerName,
+					services:      contractData.services,
+					schedule:      contractData.schedule,
+					totalPrice:    contractData.totalPrice,
+					signedAt:      new Date().toISOString()
 				})
-			});
+			}).catch((e) => console.error('[contract] confirmation email failed:', e));
 
 			onComplete();
-		} catch (error) {
-			console.error('Contract submission error:', error);
+		} catch (err) {
+			console.error('[contract] finalize error:', err);
 			toast.error('Failed to submit contract. Please try again.');
 		} finally {
 			submitting = false;
 		}
 	}
-
-	$effect(() => {
-		getLocation();
-	});
 </script>
 
-<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-	<div class="bg-white rounded-xl shadow-xl max-w-2xl w-full my-8">
+<div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
+	<div class="my-8 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+
 		<!-- Header -->
-		<div class="px-6 py-4 border-b border-gray-200">
-			<h2 class="text-xl font-semibold text-gray-900">Service Agreement</h2>
-			<p class="text-sm text-gray-600 mt-1">Step {step} of 4</p>
+		<div class="bg-gradient-to-br from-green-700 to-green-600 px-6 py-5 text-white">
+			<h2 class="text-lg font-bold">Service Agreement</h2>
+			<!-- Step indicator -->
+			<div class="mt-3 flex items-center gap-2">
+				{#each STEP_LABELS as label, i}
+					{@const num = i + 1}
+					{@const done   = step > num}
+					{@const active = step === num}
+					<div class="flex items-center gap-2">
+						<div class="flex items-center gap-1.5">
+							<div class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold
+								{done   ? 'bg-white text-green-700' :
+								 active ? 'bg-white/30 text-white ring-2 ring-white' :
+								          'bg-white/10 text-white/50'}">
+								{#if done}
+									<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+									</svg>
+								{:else}{num}{/if}
+							</div>
+							<span class="text-xs font-medium {active ? 'text-white' : 'text-white/50'}">{label}</span>
+						</div>
+						{#if i < STEP_LABELS.length - 1}
+							<div class="h-px w-6 {step > num ? 'bg-white' : 'bg-white/20'}"></div>
+						{/if}
+					</div>
+				{/each}
+			</div>
 		</div>
 
-		<!-- Step 1: Review Contract -->
+		<!-- ── Step 1: Review ── -->
 		{#if step === 1}
-			<div class="p-6 space-y-6 max-h-96 overflow-y-auto">
-				<div>
-					<h3 class="font-semibold text-gray-900 mb-2">Customer Information</h3>
-					<div class="text-sm text-gray-600 space-y-1">
-						<p><strong>Name:</strong> {contractData.customerName}</p>
-						<p><strong>Email:</strong> {contractData.customerEmail}</p>
-						<p><strong>Phone:</strong> {contractData.customerPhone}</p>
+			<div class="max-h-[60vh] overflow-y-auto p-6 space-y-5">
+
+				<!-- Summary -->
+				<div class="overflow-hidden rounded-xl border border-gray-100">
+					<div class="bg-gray-900 px-4 py-2.5">
+						<p class="text-xs font-semibold uppercase tracking-wide text-white">Agreement Summary</p>
+					</div>
+					<div class="divide-y divide-gray-50 bg-white">
+						<div class="flex justify-between px-4 py-3">
+							<span class="text-xs font-medium text-gray-500">Customer</span>
+							<span class="text-sm font-medium text-gray-900">{contractData.customerName}</span>
+						</div>
+						<div class="flex justify-between px-4 py-3">
+							<span class="text-xs font-medium text-gray-500">Service</span>
+							<span class="text-sm font-medium text-gray-900">{contractData.services.join(', ')}</span>
+						</div>
+						<div class="flex justify-between px-4 py-3">
+							<span class="text-xs font-medium text-gray-500">Schedule</span>
+							<span class="text-sm font-medium text-gray-900">{contractData.schedule}</span>
+						</div>
+						<div class="flex justify-between bg-green-50 px-4 py-3">
+							<span class="text-sm font-bold text-gray-900">Total Price</span>
+							<span class="text-xl font-extrabold text-green-600">${contractData.totalPrice.toFixed(2)}</span>
+						</div>
 					</div>
 				</div>
 
+				<!-- Terms -->
 				<div>
-					<h3 class="font-semibold text-gray-900 mb-2">Services Provided</h3>
-					<ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-						{#each contractData.services as service}
-							<li>{service}</li>
-						{/each}
-					</ul>
-				</div>
-
-				<div>
-					<h3 class="font-semibold text-gray-900 mb-2">Schedule</h3>
-					<p class="text-sm text-gray-600">{contractData.schedule}</p>
-				</div>
-
-				<div>
-					<h3 class="font-semibold text-gray-900 mb-2">Total Price</h3>
-					<p class="text-2xl font-bold text-green-600">
-						${contractData.totalPrice.toFixed(2)}
-					</p>
-				</div>
-
-				<div>
-					<h3 class="font-semibold text-gray-900 mb-2">Terms and Conditions</h3>
-					<div class="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg whitespace-pre-line">
+					<p class="mb-2 text-sm font-semibold text-gray-900">Terms and Conditions</p>
+					<div class="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs leading-relaxed text-gray-600 whitespace-pre-line">
 						{CONTRACT_TERMS}
 					</div>
 				</div>
 
-				<div class="flex items-start gap-2">
+				<!-- Accept checkbox -->
+				<label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100 transition-colors">
 					<input
 						type="checkbox"
-						id="terms"
 						bind:checked={termsAccepted}
-						class="mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+						class="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
 					/>
-					<label for="terms" class="text-sm text-gray-700">
+					<span class="text-sm text-gray-700">
 						I have read and agree to the terms and conditions outlined above.
-					</label>
-				</div>
+					</span>
+				</label>
 			</div>
 
-			<div class="px-6 py-4 border-t border-gray-200 flex gap-3">
-				<button
-					onclick={onCancel}
-					class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
-				>
+			<div class="flex gap-3 border-t border-gray-100 px-6 py-4">
+				<button onclick={onCancel}
+					class="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
 					Cancel
 				</button>
 				<button
 					onclick={() => (step = 2)}
 					disabled={!termsAccepted}
-					class="flex-1 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-				>
+					class="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
 					Continue to Signature
 				</button>
 			</div>
 		{/if}
 
-		<!-- Step 2: Signature -->
+		<!-- ── Step 2: Signature ── -->
 		{#if step === 2}
-			<div class="p-6 space-y-6">
+			<div class="p-6 space-y-5">
 				<div>
-					<h3 class="font-semibold text-gray-900 mb-2">
-						Please sign below to accept this agreement
-					</h3>
-					<p class="text-sm text-gray-600">
-						By signing, you agree to the terms and conditions outlined in this contract.
-					</p>
+					<p class="text-sm font-semibold text-gray-900">Sign below to accept this agreement</p>
+					<p class="mt-1 text-xs text-gray-500">By signing, you agree to the terms and conditions of this service contract.</p>
 				</div>
 
 				<ContractSignature onSave={handleSignatureSave} onClear={handleSignatureClear} />
 
 				{#if signatureData}
-					<div class="bg-green-50 border border-green-200 rounded-lg p-4">
-						<p class="text-sm text-green-800">✓ Signature saved</p>
+					<div class="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+						<svg class="h-4 w-4 shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+						</svg>
+						<span class="text-sm font-medium text-green-800">Signature saved</span>
 					</div>
 				{/if}
 			</div>
 
-			<div class="px-6 py-4 border-t border-gray-200 flex gap-3">
-				<button
-					onclick={() => (step = 1)}
-					class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
-				>
+			<div class="flex gap-3 border-t border-gray-100 px-6 py-4">
+				<button onclick={() => (step = 1)}
+					class="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
 					Back
 				</button>
 				<button
-					onclick={sendSMSVerification}
+					onclick={() => (step = 3)}
 					disabled={!signatureData}
-					class="flex-1 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-				>
-					Verify Phone Number
-				</button>
-			</div>
-		{/if}
-
-		<!-- Step 3: SMS Verification -->
-		{#if step === 3}
-			<div class="p-6 space-y-6">
-				<div>
-					<h3 class="font-semibold text-gray-900 mb-2">Verify Your Phone Number</h3>
-					<p class="text-sm text-gray-600">
-						We've sent a verification code to {contractData.customerPhone}
-					</p>
-				</div>
-
-				<div>
-					<label for="sms-code" class="block text-sm font-medium text-gray-700 mb-1">
-						Enter 6-digit code
-					</label>
-					<input
-						id="sms-code"
-						type="text"
-						bind:value={smsCode}
-						maxlength="6"
-						placeholder="000000"
-						class="w-full px-4 py-3 text-center text-2xl tracking-widest border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-					/>
-				</div>
-
-				<button
-					onclick={() => sendSMSVerification()}
-					class="text-sm text-blue-600 hover:text-blue-700 underline"
-				>
-					Resend code
-				</button>
-			</div>
-
-			<div class="px-6 py-4 border-t border-gray-200 flex gap-3">
-				<button
-					onclick={() => (step = 2)}
-					disabled={submitting}
-					class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50"
-				>
-					Back
-				</button>
-				<button
-					onclick={verifySMSCode}
-					disabled={smsCode.length !== 6 || submitting}
-					class="flex-1 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-				>
+					class="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
 					Continue to Payment
 				</button>
 			</div>
 		{/if}
 
-		<!-- Step 4: Payment -->
-		{#if step === 4}
-			<div class="p-6 space-y-6">
-				<div>
-					<h3 class="font-semibold text-gray-900 mb-2">Payment</h3>
-					<p class="text-sm text-gray-600 mb-4">
-						Enter your card details to complete the service agreement.
-					</p>
-					<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-						<p class="text-sm text-blue-800">
-							<strong>Amount Due:</strong> ${contractData.totalPrice.toFixed(2)}
-						</p>
+		<!-- ── Step 3: Payment ── -->
+		{#if step === 3}
+			<div class="p-6 space-y-5">
+				<div class="overflow-hidden rounded-xl border border-gray-100">
+					<div class="bg-gray-900 px-4 py-2.5">
+						<p class="text-xs font-semibold uppercase tracking-wide text-white">Amount Due</p>
+					</div>
+					<div class="flex items-center justify-between bg-green-50 px-4 py-4">
+						<span class="text-sm font-bold text-gray-900">{contractData.services[0]}</span>
+						<span class="text-2xl font-extrabold text-green-600">${contractData.totalPrice.toFixed(2)}</span>
 					</div>
 				</div>
 
@@ -352,11 +278,9 @@ Additional Terms and Conditions
 				/>
 			</div>
 
-			<div class="px-6 py-4 border-t border-gray-200">
-				<button
-					onclick={() => (step = 3)}
-					class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
-				>
+			<div class="border-t border-gray-100 px-6 py-4">
+				<button onclick={() => (step = 2)}
+					class="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
 					Back
 				</button>
 			</div>
