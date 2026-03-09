@@ -93,9 +93,24 @@ export const services = [
 			'Complete property upkeep'
 		],
 		pricing: []
-	}
+	},
+		{
+		id: 'lawn-aeration',
+		name: 'Lawn Aeration & Overseeding',
+		slug: 'lawn-aeration',
+		icon: 'sprout',
+		description: 'Deep aeration and premium overseeding for a thicker, healthier lawn',
+		frequency: 'seasonal',
+		features: [
+			'Core aeration to reduce compaction',
+			'Premium grass seed application',
+			'Improves water and nutrient absorption',
+			'Best done in spring or fall',
+			'Visible results within 2–3 weeks'
+		],
+		pricing: []
+	},
 ];
-
 export const serviceAreas = [
   // Chicago City Proper (60601-60661, 60666-60699, 60701-60712, 60714)
   '60601', '60602', '60603', '60604', '60605', '60606', '60607', '60608', '60609', '60610',

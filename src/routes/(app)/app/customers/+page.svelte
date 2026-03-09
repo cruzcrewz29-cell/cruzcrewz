@@ -23,6 +23,7 @@
     'Bush, Shrub & Tree Care',
     'Spring & Fall Cleanups',
     'Landscape Maintenance',
+	'Lawn Aeration & Overseeding'
   ];
 
   type Customer = {

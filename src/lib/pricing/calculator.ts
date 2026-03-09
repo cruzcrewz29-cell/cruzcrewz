@@ -191,6 +191,25 @@ export function calcLandscape(inputs: LandscapeInputs): number {
   return Math.round(Math.max(LANDSCAPE_MIN, Math.min(LANDSCAPE_MAX, price)));
 }
 
+// ─── Lawn Aeration & Overseeding ─────────────────────────────────────────────
+//
+// Aeration = 3× mowing rate
+// Overseeding = 50% of aeration price (1.5× mowing rate)
+// Combined = 4.5× mowing rate
+
+const AERATION_MULTIPLIER   = 3.0;
+const OVERSEEDING_MULTIPLIER = 1.5;
+const AERATION_MIN = 125;
+const AERATION_MAX = 950;
+
+export function calcAeration(sqft: number, adminRule?: AdminRule | null): number {
+  const mowRate = adminRule?.price_per_sqft ?? MOWING_RATE_PER_SQFT;
+  const price = sqft * mowRate * (AERATION_MULTIPLIER + OVERSEEDING_MULTIPLIER);
+  const min = adminRule?.min_price ?? AERATION_MIN;
+  const max = adminRule?.max_price ?? AERATION_MAX;
+  return Math.round(Math.max(min, Math.min(max, price)));
+}
+
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
 export interface AdminRule {

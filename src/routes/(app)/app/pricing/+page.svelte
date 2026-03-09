@@ -34,7 +34,8 @@
 		'Trimming & Edging',
 		'Bush, Shrub & Tree Care',
 		'Spring & Fall Cleanups',
-		'Landscape Maintenance'
+		'Landscape Maintenance',
+		'Lawn Aeration & Overseeding'
 	];
 
 	let formData = $state({

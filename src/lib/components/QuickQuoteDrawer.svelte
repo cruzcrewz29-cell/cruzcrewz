@@ -17,6 +17,7 @@
     'Bush, Shrub & Tree Care',
     'Spring & Fall Cleanups',
     'Landscape Maintenance',
+    'Lawn Aeration & Overseeding'
   ];
 
   const FREQUENCIES = [
@@ -77,9 +78,12 @@
     addressDebounce = setTimeout(async () => {
       addressLoading = true;
       try {
-        const res = await fetch(`/api/autocomplete-address?q=${encodeURIComponent(val)}`);
+        const res = await fetch(`/api/autocomplete-address?query=${encodeURIComponent(val)}`);
         const data = await res.json();
-        addressSuggestions = data.suggestions ?? [];
+        addressSuggestions = (data.predictions ?? []).map((p: any) => ({
+        description: p.description,
+        place_id: p.place_id,
+        }));
       } finally {
         addressLoading = false;
       }
@@ -87,9 +91,9 @@
   }
 
   function selectAddress(suggestion: any) {
-    address = suggestion.description ?? suggestion.formatted ?? suggestion;
-    addressSuggestions = [];
-  }
+  address = suggestion.description;
+  addressSuggestions = [];
+}
 
   // ── Price calculation ────────────────────────────────────────────────────
   async function calculatePrice() {

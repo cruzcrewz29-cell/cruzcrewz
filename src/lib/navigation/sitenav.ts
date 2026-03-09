@@ -7,6 +7,7 @@ import ImageIcon from 'lucide-svelte/icons/image';
 import MessageSquare from 'lucide-svelte/icons/message-square';
 import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
 import DollarSign from 'lucide-svelte/icons/dollar-sign';
+import RouteIcon from 'lucide-svelte/icons/route';
 
 
 export type NavItem = {
@@ -70,5 +71,12 @@ export const SITE_NAV: NavItem[] = [
 	href: '/app/pricing',
 	section: 'Pricing',
 	icon: DollarSign
-}
+},
+
+{
+  href: '/app/routes',
+  label: 'Routes',
+  icon: RouteIcon,
+  section: 'Routes'
+},
 ];

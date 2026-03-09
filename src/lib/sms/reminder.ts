@@ -157,6 +157,7 @@ function shortServiceName(serviceType: string): string {
     'Bush, Shrub & Tree Care':  'shrub & tree care',
     'Spring & Fall Cleanups':   'seasonal cleanup',
     'Landscape Maintenance':    'landscape maintenance',
+    'Lawn Aeration & Overseeding': 'lawn aeration & overseeding',
   };
   return map[serviceType] ?? serviceType.toLowerCase();
 }

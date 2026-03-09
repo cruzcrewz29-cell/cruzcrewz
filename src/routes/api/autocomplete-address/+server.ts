@@ -10,7 +10,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			return json({ predictions: [] });
 		}
 
-		const autocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&types=address&components=country:us&key=${GOOGLE_MAPS_API_KEY}`;
+		const autocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&types=address&components=country:us&location=41.8781,-87.6298&radius=80000&strictbounds=false&key=${GOOGLE_MAPS_API_KEY}`;		
 		
 		const response = await fetch(autocompleteUrl);
 		const data = await response.json();

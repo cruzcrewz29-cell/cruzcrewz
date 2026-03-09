@@ -12,6 +12,7 @@
     calcTreeCare,
     calcCleanup,
     calcLandscape,
+    calcAeration,
     type YardTierId,
     type ShrubHeight,
     type TrimCondition,
@@ -106,7 +107,8 @@
   let isTreeCare  = $derived(formData.selectedService === 'tree-care');
   let isCleanup   = $derived(formData.selectedService === 'seasonal-cleanup');
   let isLandscape = $derived(formData.selectedService === 'landscape-maintenance');
-  let isLotBased  = $derived(isMowing || isEdging);
+  let isAeration = $derived(formData.selectedService === 'lawn-aeration');
+  let isLotBased  = $derived(isMowing || isEdging || isAeration); 
 
   // ── Address autocomplete ─────────────────────────────────────────────────
   const searchAddresses = debounce(async (query: string) => {
@@ -238,9 +240,11 @@
   }
 
   async function calculatePriceForMowing(sqft: number) {
-    const rule = await getAdminRule();
-    estimatedPrice = isMowing ? calcMowing(sqft, rule) : calcEdging(sqft, rule);
-  }
+  const rule = await getAdminRule();
+  if (isMowing)    estimatedPrice = calcMowing(sqft, rule);
+  else if (isEdging)    estimatedPrice = calcEdging(sqft, rule);
+  else if (isAeration)  estimatedPrice = calcAeration(sqft, rule);
+}
 
   function calculatePriceForTreeCare() {
     if (treeCareInputs.shrubCount === 0 && treeCareInputs.treeCount === 0) {
@@ -486,6 +490,11 @@
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-6 7 6v12"/><path d="M9 20v-5h6v5"/></svg>
                   {:else if service.id === 'landscape-maintenance'}
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    {:else if service.id === 'lawn-aeration'}
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 22V12M12 12C12 12 8 10 8 6a4 4 0 018 0c0 4-4 6-4 6z"/>
+                      <path d="M8 22h8"/>
+                    </svg>
                   {/if}
                 </div>
                 <div class="flex-1 min-w-0">

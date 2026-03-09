@@ -373,6 +373,7 @@
 						<option value="Aeration & Overseeding">Aeration & Overseeding</option>
 						<option value="Leaf Removal">Leaf Removal</option>
 						<option value="Landscape Maintenance">Landscape Maintenance</option>
+						<option value="Lawn Aeration & Overseeding">Lawn Aeration & Overseeding</option>
 					</select>
 				</div>
 
