@@ -127,7 +127,7 @@ export function getQuoteEmail(data: {
 	totalPrice: number;
 	jobId: string;
 }) {
-	const signUrl = `${process.env.PUBLIC_SITE_URL || 'http://localhost:5173'}/sign-contract/${data.jobId}`;
+	const signUrl = `https://cruzcrewz.com/sign-contract/${data.jobId}`;
 	
 	return {
 		subject: 'Your Cruz Crewz Quote is Ready',

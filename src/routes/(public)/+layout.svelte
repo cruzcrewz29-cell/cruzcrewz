@@ -55,16 +55,17 @@
         <div>
           <h4 class="text-sm font-semibold uppercase tracking-wider text-white">Company</h4>
           <ul class="mt-4 space-y-2 text-sm">
-            <li><a href="/quote" class="transition-colors hover:text-white">Get Quote</a></li>
-            <li><a href="/services" class="transition-colors hover:text-white">Services</a></li>
-            <li><a href="/app/login" class="transition-colors hover:text-white">Admin Login</a></li>
-          </ul>
+          <li><a href="/quote" class="transition-colors hover:text-white">Get Quote</a></li>
+          <li><a href="/services" class="transition-colors hover:text-white">Services</a></li>
+          <li><a href="/privacy" class="transition-colors hover:text-white">Privacy Policy</a></li>
+          <li><a href="/terms" class="transition-colors hover:text-white">Terms & Conditions</a></li>
+          <li><a href="/app/login" class="transition-colors hover:text-white">Admin Login</a></li>
+</ul>
         </div>
       </div>
       
       <div class="mt-8 border-t border-gray-800 pt-8 text-center text-sm">
-        <p>&copy; 2025 Cruz Crewz. All rights reserved.</p>
-      </div>
+      <p>&copy; {new Date().getFullYear()} Cruz Crewz LLC. All rights reserved. Serving Chicago & Northwest Indiana.</p>      </div>
     </div>
   </footer>
 </div>

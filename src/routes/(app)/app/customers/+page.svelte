@@ -1,316 +1,610 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { supabase } from '$lib/supabase';
-	import Plus from 'lucide-svelte/icons/plus';
-	import Mail from 'lucide-svelte/icons/mail';
-	import Phone from 'lucide-svelte/icons/phone';
-	import MapPin from 'lucide-svelte/icons/map-pin';
-	import Search from 'lucide-svelte/icons/search';
-	import Pencil from 'lucide-svelte/icons/pencil';
-	import Trash2 from 'lucide-svelte/icons/trash-2';
+  // src/routes/(app)/app/customers/+page.svelte
+  import { onMount } from 'svelte';
+  import { supabase } from '$lib/supabase';
+  import { toast } from 'svelte-sonner';
+  import Plus from 'lucide-svelte/icons/plus';
+  import Mail from 'lucide-svelte/icons/mail';
+  import Phone from 'lucide-svelte/icons/phone';
+  import MapPin from 'lucide-svelte/icons/map-pin';
+  import Search from 'lucide-svelte/icons/search';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
+  import X from 'lucide-svelte/icons/x';
+  import DollarSign from 'lucide-svelte/icons/dollar-sign';
+  import ChevronRight from 'lucide-svelte/icons/chevron-right';
+  import Briefcase from 'lucide-svelte/icons/briefcase';
+  import CirclePlus from 'lucide-svelte/icons/circle-plus';
+  import Trash from 'lucide-svelte/icons/trash';
 
-	type Customer = {
-		id: string;
-		name: string;
-		email: string | null;
-		phone: string | null;
-		address: string | null;
-		created_at: string;
-		job_count?: number;
-		total_spent?: number;
-	};
+  const SERVICES = [
+    'Lawn Mowing',
+    'Trimming & Edging',
+    'Bush, Shrub & Tree Care',
+    'Spring & Fall Cleanups',
+    'Landscape Maintenance',
+  ];
 
-	let customers = $state<Customer[]>([]);
-	let filteredCustomers = $state<Customer[]>([]);
-	let loading = $state(true);
-	let searchQuery = $state('');
-	let showModal = $state(false);
-	let editingCustomer = $state<Customer | null>(null);
+  type Customer = {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    created_at: string;
+    job_count?: number;
+    total_spent?: number;
+  };
 
-	let formData = $state({
-		name: '',
-		email: '',
-		phone: '',
-		address: ''
-	});
+  type PriceOverride = {
+    id?: string;
+    service_type: string;
+    price: number;
+  };
 
-	onMount(async () => {
-		await loadCustomers();
-		loading = false;
-	});
+  type Job = {
+    id: string;
+    service_type: string;
+    status: string;
+    scheduled_date: string | null;
+    price: number | null;
+  };
 
-	async function loadCustomers() {
-		const { data: customersData } = await supabase
-			.from('customers')
-			.select('*')
-			.order('created_at', { ascending: false });
+  let customers        = $state<Customer[]>([]);
+  let filteredCustomers = $state<Customer[]>([]);
+  let loading          = $state(true);
+  let searchQuery      = $state('');
 
-		if (!customersData) { customers = []; filteredCustomers = []; return; }
+  // Edit/add modal
+  let showModal        = $state(false);
+  let editingCustomer  = $state<Customer | null>(null);
+  let formData         = $state({ name: '', email: '', phone: '', address: '' });
 
-		const customerIds = customersData.map(c => c.id);
-		const { data: jobsData } = await supabase
-			.from('jobs')
-			.select('customer_id, price')
-			.in('customer_id', customerIds);
+  // Customer detail panel
+  let detailOpen       = $state(false);
+  let detailCustomer   = $state<Customer | null>(null);
+  let detailJobs       = $state<Job[]>([]);
+  let detailOverrides  = $state<PriceOverride[]>([]);
+  let detailLoading    = $state(false);
 
-		const jobStats = (jobsData || []).reduce((acc, job) => {
-			if (!job.customer_id) return acc;
-			if (!acc[job.customer_id]) acc[job.customer_id] = { count: 0, total: 0 };
-			acc[job.customer_id].count++;
-			acc[job.customer_id].total += Number(job.price) || 0;
-			return acc;
-		}, {} as Record<string, { count: number; total: number }>);
+  // New override form
+  let newOverrideService = $state(SERVICES[0]);
+  let newOverridePrice   = $state('');
+  let savingOverride     = $state(false);
 
-		customers = customersData.map(customer => ({
-			...customer,
-			job_count: jobStats[customer.id]?.count || 0,
-			total_spent: jobStats[customer.id]?.total || 0
-		}));
+  // ── Load ────────────────────────────────────────────────────────────────────
+  onMount(async () => {
+    await loadCustomers();
+    loading = false;
+  });
 
-		filteredCustomers = customers;
-	}
+  async function loadCustomers() {
+    const { data: customersData } = await supabase
+      .from('customers')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-	function openAddModal() {
-		editingCustomer = null;
-		formData = { name: '', email: '', phone: '', address: '' };
-		showModal = true;
-	}
+    if (!customersData) { customers = []; filteredCustomers = []; return; }
 
-	function openEditModal(customer: Customer) {
-		editingCustomer = customer;
-		formData = {
-			name: customer.name,
-			email: customer.email || '',
-			phone: customer.phone || '',
-			address: customer.address || ''
-		};
-		showModal = true;
-	}
+    const ids = customersData.map(c => c.id);
+    const { data: jobsData } = await supabase
+      .from('jobs')
+      .select('customer_id, price')
+      .in('customer_id', ids);
 
-	async function handleSubmit(e: Event) {
-		e.preventDefault();
-		if (!formData.name.trim()) return;
+    const stats = (jobsData || []).reduce((acc, job) => {
+      if (!job.customer_id) return acc;
+      if (!acc[job.customer_id]) acc[job.customer_id] = { count: 0, total: 0 };
+      acc[job.customer_id].count++;
+      acc[job.customer_id].total += Number(job.price) || 0;
+      return acc;
+    }, {} as Record<string, { count: number; total: number }>);
 
-		const payload = {
-			name: formData.name.trim(),
-			email: formData.email.trim() || null,
-			phone: formData.phone.trim() || null,
-			address: formData.address.trim() || null
-		};
+    customers = customersData.map(c => ({
+      ...c,
+      job_count:   stats[c.id]?.count  || 0,
+      total_spent: stats[c.id]?.total  || 0,
+    }));
+    filteredCustomers = customers;
+  }
 
-		if (editingCustomer) {
-			await supabase.from('customers').update(payload).eq('id', editingCustomer.id);
-		} else {
-			await supabase.from('customers').insert(payload);
-		}
+  // ── Customer detail panel ───────────────────────────────────────────────────
+  async function openDetail(customer: Customer) {
+    detailCustomer = customer;
+    detailOpen = true;
+    detailLoading = true;
+    newOverrideService = SERVICES[0];
+    newOverridePrice = '';
 
-		showModal = false;
-		await loadCustomers();
-	}
+    const [jobsRes, overridesRes] = await Promise.all([
+      supabase
+        .from('jobs')
+        .select('id, service_type, status, scheduled_date, price')
+        .eq('customer_id', customer.id)
+        .order('scheduled_date', { ascending: false })
+        .limit(10),
+      supabase
+        .from('customer_price_overrides')
+        .select('id, service_type, price')
+        .eq('customer_id', customer.id),
+    ]);
 
-	async function deleteCustomer(id: string) {
-		if (!confirm('Delete this customer? Their jobs will be unlinked but not deleted.')) return;
-		await supabase.from('customers').delete().eq('id', id);
-		await loadCustomers();
-	}
+    detailJobs      = jobsRes.data  ?? [];
+    detailOverrides = overridesRes.data ?? [];
+    detailLoading   = false;
+  }
 
-	function formatCurrency(amount: number) {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-	}
+  function closeDetail() {
+    detailOpen = false;
+    setTimeout(() => {
+      detailCustomer = null;
+      detailJobs = [];
+      detailOverrides = [];
+    }, 300);
+  }
 
-	function formatDate(date: string) {
-		return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-	}
+  async function saveOverride() {
+    if (!detailCustomer || !newOverridePrice || parseFloat(newOverridePrice) <= 0) return;
+    savingOverride = true;
 
-	$effect(() => {
-		if (!searchQuery.trim()) {
-			filteredCustomers = customers;
-		} else {
-			const query = searchQuery.toLowerCase();
-			filteredCustomers = customers.filter(c =>
-				c.name.toLowerCase().includes(query) ||
-				c.email?.toLowerCase().includes(query) ||
-				c.phone?.includes(query)
-			);
-		}
-	});
+    try {
+      // Check if override exists for this service
+      const existing = detailOverrides.find(o => o.service_type === newOverrideService);
+
+      if (existing?.id) {
+        const { error } = await supabase
+          .from('customer_price_overrides')
+          .update({ price: parseFloat(newOverridePrice) })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('customer_price_overrides')
+          .insert({
+            customer_id:  detailCustomer.id,
+            service_type: newOverrideService,
+            price:        parseFloat(newOverridePrice),
+          });
+        if (error) throw error;
+      }
+
+      // Reload overrides
+      const { data } = await supabase
+        .from('customer_price_overrides')
+        .select('id, service_type, price')
+        .eq('customer_id', detailCustomer.id);
+      detailOverrides = data ?? [];
+
+      newOverridePrice = '';
+      toast.success('Price override saved');
+    } catch (err) {
+      toast.error('Failed to save override');
+    } finally {
+      savingOverride = false;
+    }
+  }
+
+  async function deleteOverride(id: string) {
+    await supabase.from('customer_price_overrides').delete().eq('id', id);
+    detailOverrides = detailOverrides.filter(o => o.id !== id);
+    toast.success('Override removed');
+  }
+
+  // ── Add/Edit modal ──────────────────────────────────────────────────────────
+  function openAddModal() {
+    editingCustomer = null;
+    formData = { name: '', email: '', phone: '', address: '' };
+    showModal = true;
+  }
+
+  function openEditModal(customer: Customer, e: Event) {
+    e.stopPropagation();
+    editingCustomer = customer;
+    formData = {
+      name:    customer.name,
+      email:   customer.email  || '',
+      phone:   customer.phone  || '',
+      address: customer.address || '',
+    };
+    showModal = true;
+  }
+
+  async function handleSubmit(e: Event) {
+    e.preventDefault();
+    if (!formData.name.trim()) return;
+
+    const payload = {
+      name:    formData.name.trim(),
+      email:   formData.email.trim()   || null,
+      phone:   formData.phone.trim()   || null,
+      address: formData.address.trim() || null,
+    };
+
+    if (editingCustomer) {
+      await supabase.from('customers').update(payload).eq('id', editingCustomer.id);
+    } else {
+      await supabase.from('customers').insert(payload);
+    }
+
+    showModal = false;
+    await loadCustomers();
+  }
+
+  async function deleteCustomer(id: string, e: Event) {
+    e.stopPropagation();
+    if (!confirm('Delete this customer? Their jobs will be unlinked but not deleted.')) return;
+    await supabase.from('customers').delete().eq('id', id);
+    await loadCustomers();
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function formatCurrency(n: number) {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+  }
+
+  function formatDate(d: string) {
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function statusColor(status: string) {
+    const map: Record<string, string> = {
+      pending:   'bg-amber-100 text-amber-700',
+      scheduled: 'bg-blue-100 text-blue-700',
+      confirmed: 'bg-emerald-100 text-emerald-700',
+      completed: 'bg-gray-100 text-gray-600',
+      cancelled: 'bg-red-100 text-red-600',
+    };
+    return map[status] ?? 'bg-gray-100 text-gray-600';
+  }
+
+  $effect(() => {
+    if (!searchQuery.trim()) {
+      filteredCustomers = customers;
+    } else {
+      const q = searchQuery.toLowerCase();
+      filteredCustomers = customers.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.phone?.includes(q)
+      );
+    }
+  });
 </script>
 
 <div class="space-y-6">
-	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-semibold text-gray-900">Customers</h1>
-		<button
-			onclick={openAddModal}
-			class="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-		>
-			<Plus class="h-4 w-4" />
-			Add Customer
-		</button>
-	</div>
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-semibold text-gray-900">Customers</h1>
+    <button
+      onclick={openAddModal}
+      class="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+    >
+      <Plus class="h-4 w-4" />
+      Add Customer
+    </button>
+  </div>
 
-	<div class="relative">
-		<Search class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-		<input
-			type="text"
-			bind:value={searchQuery}
-			placeholder="Search customers by name, email, or phone..."
-			class="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-		/>
-	</div>
+  <div class="relative">
+    <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+    <input
+      type="text"
+      bind:value={searchQuery}
+      placeholder="Search customers by name, email, or phone..."
+      class="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+    />
+  </div>
 
-	{#if loading}
-		<div class="flex items-center justify-center h-64">
-			<p class="text-gray-500">Loading...</p>
-		</div>
-	{:else if filteredCustomers.length === 0}
-		<div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
-			<p class="text-gray-500">{searchQuery ? 'No customers found' : 'No customers yet'}</p>
-		</div>
-	{:else}
-		<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-			<div class="overflow-x-auto">
-				<table class="w-full">
-					<thead class="bg-gray-50 border-b border-gray-200">
-						<tr>
-							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jobs</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Spent</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-200">
-						{#each filteredCustomers as customer}
-							<tr class="hover:bg-gray-50 transition-colors">
-								<td class="px-6 py-4">
-									<div class="font-medium text-gray-900">{customer.name}</div>
-									{#if customer.address}
-										<div class="flex items-center gap-1 text-xs text-gray-500 mt-1">
-											<MapPin class="h-3 w-3" />
-											{customer.address}
-										</div>
-									{/if}
-								</td>
-								<td class="px-6 py-4">
-									{#if customer.email}
-										<div class="flex items-center gap-2 text-sm text-gray-600">
-											<Mail class="h-4 w-4 text-gray-400" />
-											{customer.email}
-										</div>
-									{/if}
-									{#if customer.phone}
-										<div class="flex items-center gap-2 text-sm text-gray-600 mt-1">
-											<Phone class="h-4 w-4 text-gray-400" />
-											{customer.phone}
-										</div>
-									{/if}
-									{#if !customer.email && !customer.phone}
-										<span class="text-sm text-gray-400">No contact info</span>
-									{/if}
-								</td>
-								<td class="px-6 py-4">
-									<span class="text-sm text-gray-900">{customer.job_count || 0}</span>
-								</td>
-								<td class="px-6 py-4">
-									<span class="text-sm font-medium text-gray-900">
-										{formatCurrency(customer.total_spent || 0)}
-									</span>
-								</td>
-								<td class="px-6 py-4">
-									<span class="text-sm text-gray-600">{formatDate(customer.created_at)}</span>
-								</td>
-								<td class="px-6 py-4">
-									<div class="flex items-center gap-2">
-										<button
-											onclick={() => openEditModal(customer)}
-											class="p-1.5 text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
-										>
-											<Pencil class="h-4 w-4" />
-										</button>
-										<button
-											onclick={() => deleteCustomer(customer.id)}
-											class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-										>
-											<Trash2 class="h-4 w-4" />
-										</button>
-									</div>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		</div>
-	{/if}
+  {#if loading}
+    <div class="flex h-64 items-center justify-center">
+      <p class="text-gray-500">Loading...</p>
+    </div>
+  {:else if filteredCustomers.length === 0}
+    <div class="rounded-xl border border-gray-200 bg-white p-12 text-center">
+      <p class="text-gray-500">{searchQuery ? 'No customers found' : 'No customers yet'}</p>
+    </div>
+  {:else}
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="border-b border-gray-200 bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Customer</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Contact</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Jobs</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Total Spent</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Added</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            {#each filteredCustomers as customer}
+              <tr
+                class="cursor-pointer hover:bg-emerald-50/50 transition-colors"
+                onclick={() => openDetail(customer)}
+              >
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2">
+                    <div class="font-medium text-gray-900">{customer.name}</div>
+                    {#if detailOverrides.length > 0 && detailCustomer?.id === customer.id}
+                      <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Custom Price</span>
+                    {/if}
+                  </div>
+                  {#if customer.address}
+                    <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                      <MapPin class="h-3 w-3" />
+                      {customer.address}
+                    </div>
+                  {/if}
+                </td>
+                <td class="px-6 py-4">
+                  {#if customer.email}
+                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                      <Mail class="h-4 w-4 text-gray-400" />
+                      {customer.email}
+                    </div>
+                  {/if}
+                  {#if customer.phone}
+                    <div class="mt-1 flex items-center gap-2 text-sm text-gray-600">
+                      <Phone class="h-4 w-4 text-gray-400" />
+                      {customer.phone}
+                    </div>
+                  {/if}
+                  {#if !customer.email && !customer.phone}
+                    <span class="text-sm text-gray-400">No contact info</span>
+                  {/if}
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-gray-900">{customer.job_count || 0}</span>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm font-medium text-gray-900">{formatCurrency(customer.total_spent || 0)}</span>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-gray-600">{formatDate(customer.created_at)}</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-1">
+                    <button
+                      onclick={(e) => openEditModal(customer, e)}
+                      class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                    >
+                      <Pencil class="h-4 w-4" />
+                    </button>
+                    <button
+                      onclick={(e) => deleteCustomer(customer.id, e)}
+                      class="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 class="h-4 w-4" />
+                    </button>
+                    <ChevronRight class="h-4 w-4 text-gray-300" />
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {/if}
 </div>
 
-<!-- Add/Edit Modal -->
+<!-- ── Customer Detail Drawer ── -->
+{#if detailOpen}
+  <div class="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onclick={closeDetail}></div>
+{/if}
+
+<div class="fixed right-0 top-0 z-50 h-full w-full max-w-md transform bg-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col
+  {detailOpen ? 'translate-x-0' : 'translate-x-full'}">
+
+  {#if detailCustomer}
+    <!-- Header -->
+    <div class="flex items-center justify-between border-b border-gray-100 bg-gray-900 px-5 py-4">
+      <div>
+        <p class="font-bold text-white">{detailCustomer.name}</p>
+        <p class="text-xs text-gray-400">{detailCustomer.email ?? detailCustomer.phone ?? 'No contact info'}</p>
+      </div>
+      <button onclick={closeDetail} class="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+        <X class="h-5 w-5" />
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto">
+      {#if detailLoading}
+        <div class="flex h-48 items-center justify-center text-gray-400 text-sm">Loading...</div>
+      {:else}
+        <div class="p-5 space-y-6">
+
+          <!-- Stats row -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-center">
+              <p class="text-2xl font-extrabold text-gray-900">{detailCustomer.job_count ?? 0}</p>
+              <p class="text-xs text-gray-500 mt-0.5">Total Jobs</p>
+            </div>
+            <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center">
+              <p class="text-2xl font-extrabold text-emerald-700">{formatCurrency(detailCustomer.total_spent ?? 0)}</p>
+              <p class="text-xs text-gray-500 mt-0.5">Total Spent</p>
+            </div>
+          </div>
+
+          <!-- Contact info -->
+          <div class="rounded-xl border border-gray-100 divide-y divide-gray-50">
+            {#if detailCustomer.address}
+              <div class="flex items-center gap-3 px-4 py-3">
+                <MapPin class="h-4 w-4 shrink-0 text-gray-400" />
+                <span class="text-sm text-gray-700">{detailCustomer.address}</span>
+              </div>
+            {/if}
+            {#if detailCustomer.email}
+              <div class="flex items-center gap-3 px-4 py-3">
+                <Mail class="h-4 w-4 shrink-0 text-gray-400" />
+                <a href="mailto:{detailCustomer.email}" class="text-sm text-emerald-700 hover:underline">{detailCustomer.email}</a>
+              </div>
+            {/if}
+            {#if detailCustomer.phone}
+              <div class="flex items-center gap-3 px-4 py-3">
+                <Phone class="h-4 w-4 shrink-0 text-gray-400" />
+                <a href="tel:{detailCustomer.phone}" class="text-sm text-emerald-700 hover:underline">{detailCustomer.phone}</a>
+              </div>
+            {/if}
+          </div>
+
+          <!-- ── Custom Pricing ── -->
+          <div>
+            <div class="mb-3 flex items-center gap-2">
+              <DollarSign class="h-4 w-4 text-emerald-600" />
+              <p class="text-sm font-semibold text-gray-900">Custom Pricing</p>
+            </div>
+            <p class="mb-3 text-xs text-gray-500">
+              Set a fixed price for this customer that overrides all global rules and lot-size calculations.
+            </p>
+
+            <!-- Existing overrides -->
+            {#if detailOverrides.length > 0}
+              <div class="mb-3 overflow-hidden rounded-xl border border-gray-100">
+                {#each detailOverrides as override}
+                  <div class="flex items-center justify-between border-b border-gray-50 px-4 py-3 last:border-0">
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">{override.service_type}</p>
+                      <p class="text-xs text-emerald-700 font-semibold mt-0.5">{formatCurrency(override.price)}</p>
+                    </div>
+                    <button
+                      onclick={() => override.id && deleteOverride(override.id)}
+                      class="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    >
+                      <Trash class="h-4 w-4" />
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+
+            <!-- Add override -->
+            <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 space-y-3">
+              <p class="text-xs font-semibold text-gray-600">
+                {detailOverrides.length > 0 ? 'Add Another Override' : 'Add Price Override'}
+              </p>
+              <div class="relative">
+                <select
+                  bind:value={newOverrideService}
+                  class="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  {#each SERVICES as s}
+                    <option value={s}>{s}</option>
+                  {/each}
+                </select>
+              </div>
+              <div class="flex gap-2">
+                <div class="relative flex-1">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+                  <input
+                    type="number"
+                    bind:value={newOverridePrice}
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    class="w-full rounded-lg border border-gray-200 bg-white pl-7 pr-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                </div>
+                <button
+                  onclick={saveOverride}
+                  disabled={savingOverride || !newOverridePrice}
+                  class="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                >
+                  <CirclePlus class="h-4 w-4" />
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Recent Jobs ── -->
+          <div>
+            <div class="mb-3 flex items-center gap-2">
+              <Briefcase class="h-4 w-4 text-gray-500" />
+              <p class="text-sm font-semibold text-gray-900">Recent Jobs</p>
+            </div>
+            {#if detailJobs.length === 0}
+              <p class="text-sm text-gray-400">No jobs yet</p>
+            {:else}
+              <div class="overflow-hidden rounded-xl border border-gray-100">
+                {#each detailJobs as job}
+                  <div class="flex items-center justify-between border-b border-gray-50 px-4 py-3 last:border-0">
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">{job.service_type}</p>
+                      {#if job.scheduled_date}
+                        <p class="text-xs text-gray-500 mt-0.5">{formatDate(job.scheduled_date)}</p>
+                      {/if}
+                    </div>
+                    <div class="flex items-center gap-2">
+                      {#if job.price}
+                        <span class="text-sm font-semibold text-gray-900">{formatCurrency(job.price)}</span>
+                      {/if}
+                      <span class="rounded-full px-2 py-0.5 text-xs font-medium {statusColor(job.status)}">
+                        {job.status}
+                      </span>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+        </div>
+      {/if}
+    </div>
+
+    <!-- Footer -->
+    <div class="border-t border-gray-100 p-4">
+      <button
+        onclick={(e) => { closeDetail(); openEditModal(detailCustomer!, e); }}
+        class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        Edit Customer Info
+      </button>
+    </div>
+  {/if}
+</div>
+
+<!-- ── Add/Edit Modal ── -->
 {#if showModal}
-	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={() => (showModal = false)}>
-		<div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4" onclick={(e) => e.stopPropagation()}>
-			<div class="px-6 py-4 border-b border-gray-200">
-				<h2 class="text-lg font-semibold text-gray-900">
-					{editingCustomer ? 'Edit Customer' : 'Add New Customer'}
-				</h2>
-			</div>
-
-			<form onsubmit={handleSubmit} class="p-6 space-y-4">
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">
-						Name <span class="text-red-500">*</span>
-					</label>
-					<input
-						type="text"
-						bind:value={formData.name}
-						required
-						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-					/>
-				</div>
-
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-					<input
-						type="email"
-						bind:value={formData.email}
-						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-					/>
-				</div>
-
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-					<input
-						type="tel"
-						bind:value={formData.phone}
-						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-					/>
-				</div>
-
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-					<textarea
-						bind:value={formData.address}
-						rows="2"
-						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-					></textarea>
-				</div>
-
-				<div class="flex gap-3 pt-2">
-					<button
-						type="button"
-						onclick={() => (showModal = false)}
-						class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="flex-1 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800"
-					>
-						{editingCustomer ? 'Save Changes' : 'Add Customer'}
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={() => (showModal = false)}>
+    <div class="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl" onclick={(e) => e.stopPropagation()}>
+      <div class="border-b border-gray-200 px-6 py-4">
+        <h2 class="text-lg font-semibold text-gray-900">
+          {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
+        </h2>
+      </div>
+      <form onsubmit={handleSubmit} class="space-y-4 p-6">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Name <span class="text-red-500">*</span></label>
+          <input type="text" bind:value={formData.name} required
+            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Email</label>
+          <input type="email" bind:value={formData.email}
+            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+          <input type="tel" bind:value={formData.phone}
+            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Address</label>
+          <textarea bind:value={formData.address} rows="2"
+            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"></textarea>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick={() => (showModal = false)}
+            class="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button type="submit"
+            class="flex-1 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
+            {editingCustomer ? 'Save Changes' : 'Add Customer'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 {/if}
