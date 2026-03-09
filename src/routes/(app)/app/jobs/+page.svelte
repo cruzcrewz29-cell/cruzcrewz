@@ -163,9 +163,15 @@
 		showPaymentModal = true;
 	}
 
-	function handlePaymentSuccess() {
+	function closePaymentModal() {
 		showPaymentModal = false;
+		paymentJob = null;
+	}
+
+	function handlePaymentSuccess() {
+		closePaymentModal();
 		toast.success('Payment processed successfully!');
+		fetchJobs();
 	}
 </script>
 
@@ -295,8 +301,8 @@
 						<option value="">Select a service...</option>
 						<option value="Lawn Mowing">Lawn Mowing</option>
 						<option value="Trimming & Edging">Trimming & Edging</option>
-						<option value="Aeration & Overseeding">Aeration & Overseeding</option>
-						<option value="Leaf Removal">Leaf Removal</option>
+						<option value="Bush, Shrub & Tree Care">Bush, Shrub & Tree Care</option>
+						<option value="Spring & Fall Cleanups">Spring & Fall Cleanups</option>
 						<option value="Landscape Maintenance">Landscape Maintenance</option>
 						<option value="Lawn Aeration & Overseeding">Lawn Aeration & Overseeding</option>
 					</select>
@@ -371,36 +377,41 @@
 
 <!-- Payment Modal -->
 {#if showPaymentModal && paymentJob}
-	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={() => (showPaymentModal = false)}>
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={closePaymentModal}>
 		<div class="bg-white rounded-xl shadow-xl max-w-md w-full" onclick={(e) => e.stopPropagation()}>
-			<div class="px-6 py-4 border-b border-gray-200">
-				<h2 class="text-lg font-semibold text-gray-900">Collect Payment</h2>
-				<p class="text-sm text-gray-600 mt-1">
-					{paymentJob.customers?.name || 'Customer'} - {paymentJob.service_type}
-				</p>
+			<div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+				<div>
+					<h2 class="text-lg font-semibold text-gray-900">Collect Payment</h2>
+					<p class="text-sm text-gray-600 mt-0.5">
+						{paymentJob.customers?.name || 'Customer'} — {paymentJob.service_type}
+					</p>
+				</div>
+				<button
+					onclick={closePaymentModal}
+					class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+				>
+					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
 			</div>
 
 			<div class="p-6">
-				<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-					<p class="text-sm text-blue-800">
-						<strong>Amount:</strong> ${paymentJob.price?.toFixed(2)}
+				<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
+					<p class="text-sm text-emerald-800">
+						<strong>Amount due:</strong> {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(paymentJob.price ?? 0)}
 					</p>
 				</div>
 
+				<!-- Payment Modal -->
+				{#if showPaymentModal && paymentJob}
 				<PaymentForm
 					amount={paymentJob.price || 0}
 					jobId={paymentJob.id}
 					onSuccess={handlePaymentSuccess}
+					onCancel={closePaymentModal}
 				/>
-			</div>
-
-			<div class="px-6 py-4 border-t border-gray-200">
-				<button
-					onclick={() => (showPaymentModal = false)}
-					class="w-full px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
-				>
-					Cancel
-				</button>
+				{/if}
 			</div>
 		</div>
 	</div>
