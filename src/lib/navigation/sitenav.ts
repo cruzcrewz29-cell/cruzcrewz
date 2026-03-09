@@ -11,6 +11,7 @@ import DollarSign from 'lucide-svelte/icons/dollar-sign';
 import RouteIcon from 'lucide-svelte/icons/route';
 import TrendingUp from 'lucide-svelte/icons/trending-up';
 import MapPin from 'lucide-svelte/icons/map-pin';
+import Trophy from 'lucide-svelte/icons/trophy';
 
 export type NavItem = {
   label: string;
@@ -20,76 +21,17 @@ export type NavItem = {
 };
 
 export const SITE_NAV: NavItem[] = [
-  {
-    label: 'Dashboard',
-    href: '/app',
-    section: 'Dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    label: 'Calendar',
-    href: '/app/calendar',
-    section: 'Calendar',
-    icon: Calendar,
-  },
-  {
-    label: 'Jobs',
-    href: '/app/jobs',
-    section: 'Jobs',
-    icon: ClipboardList,
-  },
-  {
-    label: 'Customers',
-    href: '/app/customers',
-    section: 'Customers',
-    icon: Users,
-  },
-  {
-    label: 'Routes',
-    href: '/app/routes',
-    section: 'Routes',
-    icon: RouteIcon,
-  },
-  {
-    label: 'Heat Map',
-    href: '/app/heatmap',
-    section: 'Heat Map',
-    icon: MapPin,
-  },
-  {
-    label: 'Accounting',
-    href: '/app/accounting',
-    section: 'Accounting',
-    icon: TrendingUp,
-  },
-  {
-    label: 'Pricing',
-    href: '/app/pricing',
-    section: 'Pricing',
-    icon: DollarSign,
-  },
-  {
-    label: 'Portfolio',
-    href: '/app/portfolio',
-    section: 'Portfolio',
-    icon: ImageIcon,
-  },
-  {
-    label: 'Testimonials',
-    href: '/app/testimonials',
-    section: 'Testimonials',
-    icon: MessageSquare,
-  },
-  {
-    label: 'QR Analytics',
-    href: '/app/analytics',
-    section: 'QR Analytics',
-    icon: BarChart3,
-  },
-  {
-    label: 'Settings',
-    href: '/app/settings',
-    section: 'Settings',
-    icon: Settings,
-  },
+  { label: 'Dashboard',    href: '/app',               section: 'Dashboard',    icon: LayoutDashboard },
+  { label: 'Calendar',     href: '/app/calendar',       section: 'Calendar',     icon: Calendar },
+  { label: 'Jobs',         href: '/app/jobs',           section: 'Jobs',         icon: ClipboardList },
+  { label: 'Customers',    href: '/app/customers',      section: 'Customers',    icon: Users },
+  { label: 'Routes',       href: '/app/routes',         section: 'Routes',       icon: RouteIcon },
+  { label: 'Heat Map',     href: '/app/heatmap',        section: 'Heat Map',     icon: MapPin },
+  { label: 'Leaderboard',  href: '/app/leaderboard',    section: 'Leaderboard',  icon: Trophy },
+  { label: 'Accounting',   href: '/app/accounting',     section: 'Accounting',   icon: TrendingUp },
+  { label: 'Pricing',      href: '/app/pricing',        section: 'Pricing',      icon: DollarSign },
+  { label: 'Portfolio',    href: '/app/portfolio',      section: 'Portfolio',    icon: ImageIcon },
+  { label: 'Testimonials', href: '/app/testimonials',   section: 'Testimonials', icon: MessageSquare },
+  { label: 'QR Analytics', href: '/app/analytics',      section: 'QR Analytics', icon: BarChart3 },
+  { label: 'Settings',     href: '/app/settings',       section: 'Settings',     icon: Settings },
 ];

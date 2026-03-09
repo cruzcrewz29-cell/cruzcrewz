@@ -1,4 +1,5 @@
 <script lang="ts">
+	// src/routes/(app)/app/jobs/+page.svelte
 	import { supabase } from '$lib/supabase';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -7,6 +8,8 @@
 	import Trash2 from 'lucide-svelte/icons/trash-2';
 	import PaymentForm from '$lib/components/PaymentForm.svelte';
 	import CreditCard from 'lucide-svelte/icons/credit-card';
+	import Navigation from 'lucide-svelte/icons/navigation';
+	import Copy from 'lucide-svelte/icons/copy';
 
 	type Customer = { id: string; name: string; };
 
@@ -29,13 +32,22 @@
 	let showPaymentModal = $state(false);
 	let paymentJob = $state<Job | null>(null);
 
+	// Tracker state
+	let trackerLinks = $state<Record<string, string>>({}); // jobId → tracker URL
+	let sendingTracker = $state<string | null>(null);
+	let showTrackerModal = $state(false);
+	let trackerModalJob = $state<Job | null>(null);
+	let trackerUrl = $state('');
+	let crewUrl = $state('');
+	let copied = $state<'tracker' | 'crew' | null>(null);
+
 	const STATUS_OPTIONS = ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'];
 
 	const columns = [
-		{ id: 'pending', label: 'Pending', color: 'bg-gray-100' },
-		{ id: 'scheduled', label: 'Scheduled', color: 'bg-blue-100' },
-		{ id: 'in_progress', label: 'In Progress', color: 'bg-yellow-100' },
-		{ id: 'completed', label: 'Completed', color: 'bg-green-100' }
+		{ id: 'pending',     label: 'Pending',     color: 'bg-gray-100' },
+		{ id: 'scheduled',   label: 'Scheduled',   color: 'bg-blue-100' },
+		{ id: 'in_progress', label: 'In Progress',  color: 'bg-yellow-100' },
+		{ id: 'completed',   label: 'Completed',   color: 'bg-green-100' }
 	];
 
 	let formData = $state({
@@ -74,14 +86,7 @@
 
 	function openAddModal() {
 		editingJob = null;
-		formData = {
-			customer_id: '',
-			service_type: '',
-			description: '',
-			status: 'pending',
-			scheduled_date: '',
-			price: ''
-		};
+		formData = { customer_id: '', service_type: '', description: '', status: 'pending', scheduled_date: '', price: '' };
 		showModal = true;
 	}
 
@@ -100,7 +105,6 @@
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
-
 		const payload = {
 			customer_id: formData.customer_id || null,
 			service_type: formData.service_type,
@@ -109,13 +113,11 @@
 			scheduled_date: new Date(formData.scheduled_date).toISOString(),
 			price: formData.price ? Number(formData.price) : null
 		};
-
 		if (editingJob) {
 			await supabase.from('jobs').update(payload).eq('id', editingJob.id);
 		} else {
 			await supabase.from('jobs').insert(payload);
 		}
-
 		showModal = false;
 		await fetchJobs();
 	}
@@ -143,15 +145,11 @@
 	}
 
 	function revenue() {
-		return jobs
-			.filter(j => j.status === 'completed' && j.price)
-			.reduce((sum, j) => sum + Number(j.price), 0);
+		return jobs.filter(j => j.status === 'completed' && j.price).reduce((sum, j) => sum + Number(j.price), 0);
 	}
 
 	function formatDate(date: string) {
-		return new Date(date).toLocaleDateString('en-US', {
-			month: 'short', day: 'numeric', year: 'numeric'
-		});
+		return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 	}
 
 	function formatCurrency(amount: number) {
@@ -172,6 +170,39 @@
 		closePaymentModal();
 		toast.success('Payment processed successfully!');
 		fetchJobs();
+	}
+
+	// ── Tracker ───────────────────────────────────────────────────────────────
+	async function sendTracker(job: Job) {
+		sendingTracker = job.id;
+		try {
+			const res = await fetch('/api/create-tracker', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ jobId: job.id }),
+			});
+			const data = await res.json();
+			if (!data.success) throw new Error(data.error);
+
+			const base = window.location.origin;
+			trackerUrl = `${base}/track/${data.token}`;
+			crewUrl    = `${base}/crew/${data.token}`;
+			trackerLinks = { ...trackerLinks, [job.id]: trackerUrl };
+			trackerModalJob = job;
+			showTrackerModal = true;
+		} catch (err) {
+			toast.error('Failed to create tracker link');
+		} finally {
+			sendingTracker = null;
+		}
+	}
+
+	async function copyLink(type: 'tracker' | 'crew') {
+		const url = type === 'tracker' ? trackerUrl : crewUrl;
+		await navigator.clipboard.writeText(url);
+		copied = type;
+		setTimeout(() => (copied = null), 2000);
+		toast.success(type === 'tracker' ? 'Customer link copied!' : 'Crew link copied!');
 	}
 </script>
 
@@ -231,8 +262,33 @@
 												{formatCurrency(job.price)}
 											</div>
 										{/if}
+										<!-- Tracker active indicator -->
+										{#if trackerLinks[job.id]}
+											<div class="mt-2 flex items-center gap-1">
+												<div class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+												<span class="text-xs text-emerald-600 font-medium">Tracker active</span>
+											</div>
+										{/if}
 									</div>
 									<div class="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
+										<!-- Tracker button — only for scheduled/in_progress -->
+										{#if ['scheduled', 'in_progress'].includes(job.status)}
+											<button
+												onclick={() => sendTracker(job)}
+												disabled={sendingTracker === job.id}
+												class="p-1 text-gray-400 hover:text-blue-600 rounded"
+												title="Send Live Tracker"
+											>
+												{#if sendingTracker === job.id}
+													<svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+														<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+														<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+													</svg>
+												{:else}
+													<Navigation class="h-3.5 w-3.5" />
+												{/if}
+											</button>
+										{/if}
 										{#if job.price && job.status !== 'completed'}
 											<button
 												onclick={() => openPaymentModal(job)}
@@ -242,16 +298,10 @@
 												<CreditCard class="h-3.5 w-3.5" />
 											</button>
 										{/if}
-										<button
-											onclick={() => openEditModal(job)}
-											class="p-1 text-gray-400 hover:text-gray-900 rounded"
-										>
+										<button onclick={() => openEditModal(job)} class="p-1 text-gray-400 hover:text-gray-900 rounded">
 											<Pencil class="h-3.5 w-3.5" />
 										</button>
-										<button
-											onclick={() => deleteJob(job.id)}
-											class="p-1 text-gray-400 hover:text-red-600 rounded"
-										>
+										<button onclick={() => deleteJob(job.id)} class="p-1 text-gray-400 hover:text-red-600 rounded">
 											<Trash2 class="h-3.5 w-3.5" />
 										</button>
 									</div>
@@ -270,34 +320,23 @@
 	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={() => (showModal = false)}>
 		<div class="bg-white rounded-xl shadow-xl max-w-md w-full" onclick={(e) => e.stopPropagation()}>
 			<div class="px-6 py-4 border-b border-gray-200">
-				<h2 class="text-lg font-semibold text-gray-900">
-					{editingJob ? 'Edit Job' : 'Add New Job'}
-				</h2>
+				<h2 class="text-lg font-semibold text-gray-900">{editingJob ? 'Edit Job' : 'Add New Job'}</h2>
 			</div>
-
 			<form onsubmit={handleSubmit} class="p-6 space-y-4">
 				<div>
 					<label class="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-					<select
-						bind:value={formData.customer_id}
-						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-					>
+					<select bind:value={formData.customer_id}
+						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
 						<option value="">No customer assigned</option>
 						{#each customers as customer}
 							<option value={customer.id}>{customer.name}</option>
 						{/each}
 					</select>
 				</div>
-
 				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">
-						Service Type <span class="text-red-500">*</span>
-					</label>
-					<select
-						bind:value={formData.service_type}
-						required
-						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-					>
+					<label class="block text-sm font-medium text-gray-700 mb-1">Service Type <span class="text-red-500">*</span></label>
+					<select bind:value={formData.service_type} required
+						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
 						<option value="">Select a service...</option>
 						<option value="Lawn Mowing">Lawn Mowing</option>
 						<option value="Trimming & Edging">Trimming & Edging</option>
@@ -307,66 +346,38 @@
 						<option value="Lawn Aeration & Overseeding">Lawn Aeration & Overseeding</option>
 					</select>
 				</div>
-
 				<div>
 					<label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-					<textarea
-						bind:value={formData.description}
-						rows="2"
-						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-					></textarea>
+					<textarea bind:value={formData.description} rows="2"
+						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"></textarea>
 				</div>
-
 				<div class="grid grid-cols-2 gap-4">
 					<div>
 						<label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-						<select
-							bind:value={formData.status}
-							class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-						>
+						<select bind:value={formData.status}
+							class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900">
 							{#each STATUS_OPTIONS as status}
 								<option value={status}>{status.replace('_', ' ')}</option>
 							{/each}
 						</select>
 					</div>
-
 					<div>
 						<label class="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
-						<input
-							type="number"
-							bind:value={formData.price}
-							min="0"
-							step="0.01"
+						<input type="number" bind:value={formData.price} min="0" step="0.01"
 							class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-							placeholder="0.00"
-						/>
+							placeholder="0.00" />
 					</div>
 				</div>
-
 				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">
-						Scheduled Date <span class="text-red-500">*</span>
-					</label>
-					<input
-						type="date"
-						bind:value={formData.scheduled_date}
-						required
-						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-					/>
+					<label class="block text-sm font-medium text-gray-700 mb-1">Scheduled Date <span class="text-red-500">*</span></label>
+					<input type="date" bind:value={formData.scheduled_date} required
+						class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
 				</div>
-
 				<div class="flex gap-3 pt-2">
-					<button
-						type="button"
-						onclick={() => (showModal = false)}
-						class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="flex-1 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800"
-					>
+					<button type="button" onclick={() => (showModal = false)}
+						class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">Cancel</button>
+					<button type="submit"
+						class="flex-1 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800">
 						{editingJob ? 'Save Changes' : 'Add Job'}
 					</button>
 				</div>
@@ -377,41 +388,60 @@
 
 <!-- Payment Modal -->
 {#if showPaymentModal && paymentJob}
-	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={closePaymentModal}>
+	<PaymentForm
+		amount={paymentJob.price || 0}
+		jobId={paymentJob.id}
+		onSuccess={handlePaymentSuccess}
+		onCancel={closePaymentModal}
+	/>
+{/if}
+
+<!-- Tracker Links Modal -->
+{#if showTrackerModal && trackerModalJob}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={() => (showTrackerModal = false)}>
 		<div class="bg-white rounded-xl shadow-xl max-w-md w-full" onclick={(e) => e.stopPropagation()}>
-			<div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-				<div>
-					<h2 class="text-lg font-semibold text-gray-900">Collect Payment</h2>
-					<p class="text-sm text-gray-600 mt-0.5">
-						{paymentJob.customers?.name || 'Customer'} — {paymentJob.service_type}
-					</p>
-				</div>
-				<button
-					onclick={closePaymentModal}
-					class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-				>
-					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-					</svg>
-				</button>
+			<div class="px-6 py-4 border-b border-gray-200">
+				<h2 class="text-lg font-semibold text-gray-900">Live Tracker Created</h2>
+				<p class="text-sm text-gray-500 mt-0.5">{trackerModalJob.customers?.name} — {trackerModalJob.service_type}</p>
 			</div>
+			<div class="p-6 space-y-4">
 
-			<div class="p-6">
-				<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
-					<p class="text-sm text-emerald-800">
-						<strong>Amount due:</strong> {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(paymentJob.price ?? 0)}
-					</p>
+				<!-- Customer link -->
+				<div>
+					<p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Tracker Link</p>
+					<p class="mb-2 text-xs text-gray-400">Send this to the customer so they can track the crew in real time.</p>
+					<div class="flex items-center gap-2">
+						<input type="text" readonly value={trackerUrl}
+							class="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700" />
+						<button onclick={() => copyLink('tracker')}
+							class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+							<Copy class="h-3.5 w-3.5" />
+							{copied === 'tracker' ? 'Copied!' : 'Copy'}
+						</button>
+					</div>
 				</div>
 
-				<!-- Payment Modal -->
-				{#if showPaymentModal && paymentJob}
-				<PaymentForm
-					amount={paymentJob.price || 0}
-					jobId={paymentJob.id}
-					onSuccess={handlePaymentSuccess}
-					onCancel={closePaymentModal}
-				/>
-				{/if}
+				<!-- Crew link -->
+				<div>
+					<p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Crew App Link</p>
+					<p class="mb-2 text-xs text-gray-400">Send this to the crew member's phone. They'll use it to update status and share GPS.</p>
+					<div class="flex items-center gap-2">
+						<input type="text" readonly value={crewUrl}
+							class="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700" />
+						<button onclick={() => copyLink('crew')}
+							class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+							<Copy class="h-3.5 w-3.5" />
+							{copied === 'crew' ? 'Copied!' : 'Copy'}
+						</button>
+					</div>
+				</div>
+
+				<div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+					<p class="text-xs text-blue-700">The customer link auto-refreshes every 15 seconds. The crew link works on any phone — no app install needed.</p>
+				</div>
+
+				<button onclick={() => (showTrackerModal = false)}
+					class="w-full rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white hover:bg-gray-800">Done</button>
 			</div>
 		</div>
 	</div>
