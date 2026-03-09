@@ -21,8 +21,8 @@ export type YardTierId = typeof YARD_TIERS[number]['id'];
 // ─── Mowing & Edging ─────────────────────────────────────────────────────────
 
 const MOWING_RATE_PER_SQFT = 0.0095;   // $9.50 per 1,000 sqft
-const MOWING_MIN = 45;                  // minimum visit price
-const MOWING_MAX = 350;                 // cap for residential
+const MOWING_MIN = 65;                  // minimum visit price
+const MOWING_MAX = 500;                 // cap for residential
 
 export function calcMowing(sqft: number, adminRule?: AdminRule | null): number {
   const rate = adminRule?.price_per_sqft ?? MOWING_RATE_PER_SQFT;
@@ -35,7 +35,7 @@ export function calcMowing(sqft: number, adminRule?: AdminRule | null): number {
 // ─── Trimming & Edging ───────────────────────────────────────────────────────
 
 const EDGING_RATE_PER_SQFT = 0.006;
-const EDGING_MIN = 35;
+const EDGING_MIN = 45;
 const EDGING_MAX = 200;
 
 export function calcEdging(sqft: number, adminRule?: AdminRule | null): number {
@@ -55,8 +55,8 @@ export function calcEdging(sqft: number, adminRule?: AdminRule | null): number {
 //   capped at max, bumped to min
 
 const TREE_BASE_FEE = 50;            // show-up / setup fee
-const PER_SHRUB_RATE = 12;           // base price per shrub
-const PER_TREE_RATE = 45;            // base price per tree
+const PER_SHRUB_RATE = 16;           // base price per shrub
+const PER_TREE_RATE = 65;            // base price per tree
 
 // height multiplier applied to shrubs
 const SHRUB_HEIGHT_MULTIPLIERS: Record<ShrubHeight, number> = {

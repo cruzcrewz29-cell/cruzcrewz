@@ -87,19 +87,19 @@
   };
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let selectedDate   = $state(todayString());
-  let allJobs        = $state<Job[]>([]);
-  let unassignedJobs = $state<Job[]>([]);
-  let assignments    = $state<CrewAssignment[]>([]);
-  let savedCrews     = $state<Crew[]>([]);
-  let weather        = $state<any>(null);
-  let loading        = $state(false);
-  let optimizing     = $state(false);
+  let selectedDate    = $state(todayString());
+  let allJobs         = $state<Job[]>([]);
+  let unassignedJobs  = $state<Job[]>([]);
+  let assignments     = $state<CrewAssignment[]>([]);
+  let savedCrews      = $state<Crew[]>([]);
+  let weather         = $state<any>(null);
+  let loading         = $state(false);
+  let optimizing      = $state(false);
   let optimizedResult = $state<OptimizedCrew[] | null>(null);
   let weatherBriefing = $state('');
   let weatherWarnings = $state<string[]>([]);
-  let startTime      = $state('8:00 AM');
-  let shareLinks     = $state<Record<string, string>>({});
+  let startTime       = $state('8:00 AM');
+  let shareLinks      = $state<Record<string, string>>({});
 
   // New crew form
   let showNewCrew    = $state(false);
@@ -285,8 +285,9 @@
 
     optimizing = true;
     try {
+      // Use crew.name as crewId so the AI returns it back consistently
       const crewInput = crewsWithJobs.map(a => ({
-        crewId:   a.crew.id,
+        crewId:   a.crew.name,
         crewName: a.crew.name,
         color:    a.crew.color,
         stops:    a.jobs.map(j => ({
@@ -310,30 +311,32 @@
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? 'Optimization failed');
 
-      optimizedResult = [...data.result.crews];
-console.log('[debug] optimizedResult:', optimizedResult);
-console.log('[debug] assignment crew ids:', assignments.map(a => a.crew.id));
-console.log('[debug] result crew ids:', data.result.crews.map((c: any) => c.crewId));
-      weatherBriefing   = data.result.weatherBriefing;
-      weatherWarnings   = data.result.weatherWarnings ?? [];
+      // crewId in the response will now match crew.name
+      optimizedResult = data.result.crews as OptimizedCrew[];
+      weatherBriefing = data.result.weatherBriefing;
+      weatherWarnings = data.result.weatherWarnings ?? [];
 
       // Save route plans to DB and generate share tokens
-      for (const crew of data.result.crews) {
-      const { data: plan } = await supabase
-        .from('route_plans')
-        .insert({
+      // Key shareLinks by crew.name to match assignment lookup
+      for (const crew of data.result.crews as OptimizedCrew[]) {
+        // Find the original assignment to get the real UUID for crew_id
+        const originalAssignment = crewsWithJobs.find(a => a.crew.name === crew.crewId);
+        const { data: plan } = await supabase
+          .from('route_plans')
+          .insert({
             route_date:          selectedDate,
-            crew_id:             crew.crewId?.match(/^[0-9a-f-]{36}$/) ? crew.crewId : null,
+            crew_id:             originalAssignment?.crew.id ?? null,
             stops:               crew.stops,
             summary:             crew.summary,
             weather:             weather,
             total_drive_minutes: crew.totalDriveMinutes,
             status:              'active',
-        })
-        .select('share_token')
-        .single();
+          })
+          .select('share_token')
+          .single();
 
         if (plan) {
+          // Key by crew.name (same as crewId in response) for consistent lookup
           shareLinks = { ...shareLinks, [crew.crewId]: `${window.location.origin}/route/${plan.share_token}` };
         }
       }
@@ -347,18 +350,17 @@ console.log('[debug] result crew ids:', data.result.crews.map((c: any) => c.crew
     }
   }
 
-  async function copyShareLink(crewId: string) {
-    const link = shareLinks[crewId];
+  async function copyShareLink(crewName: string) {
+    const link = shareLinks[crewName];
     if (!link) return;
     await navigator.clipboard.writeText(link);
     toast.success('Link copied!');
   }
 
-  async function sendRouteText(crewId: string) {
-    const link = shareLinks[crewId];
-    const crew = optimizedResult?.find(c => c.crewId === crewId);
+  async function sendRouteText(crewName: string) {
+    const link = shareLinks[crewName];
+    const crew = optimizedResult?.find(c => c.crewId === crewName);
     if (!link || !crew) return;
-    // Open SMS with pre-filled message
     const msg = `Cruz Crewz Route for ${selectedDate} — ${crew.crewName}: ${link}`;
     window.open(`sms:?body=${encodeURIComponent(msg)}`);
   }
@@ -578,7 +580,8 @@ console.log('[debug] result crew ids:', data.result.crews.map((c: any) => c.crew
         </div>
       {:else}
         {#each assignments as assignment}
-          {@const optimizedCrew = optimizedResult?.find(c => c.crewId === assignment.crew.id)}
+          <!-- Match on crew.name since the AI returns crewId as the crew name -->
+          {@const optimizedCrew = optimizedResult?.find(c => c.crewId === assignment.crew.name)}
           <div
             class="overflow-hidden rounded-xl border-2 transition-colors
               {dragOverCrewId === assignment.crew.id ? 'border-opacity-100' : 'border-gray-200'}"
@@ -627,18 +630,18 @@ console.log('[debug] result crew ids:', data.result.crews.map((c: any) => c.crew
                         </span>
                       </div>
                     </div>
-                    <!-- Share buttons -->
-                    {#if shareLinks[assignment.crew.id]}
+                    <!-- Share buttons — keyed by crew.name -->
+                    {#if shareLinks[assignment.crew.name]}
                       <div class="flex shrink-0 gap-2">
                         <button
-                          onclick={() => copyShareLink(assignment.crew.id)}
+                          onclick={() => copyShareLink(assignment.crew.name)}
                           class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                         >
                           <Copy class="h-3.5 w-3.5" />
                           Copy Link
                         </button>
                         <button
-                          onclick={() => sendRouteText(assignment.crew.id)}
+                          onclick={() => sendRouteText(assignment.crew.name)}
                           class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
                           style="background-color: {assignment.crew.color}"
                         >
@@ -652,7 +655,7 @@ console.log('[debug] result crew ids:', data.result.crews.map((c: any) => c.crew
 
                 <!-- Ordered stops -->
                 <div class="divide-y divide-gray-50">
-                  {#each optimizedCrew.stops.sort((a, b) => a.order - b.order) as stop}
+                  {#each [...optimizedCrew.stops].sort((a, b) => a.order - b.order) as stop}
                     <div class="flex items-start gap-3 px-4 py-3">
                       <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white mt-0.5"
                         style="background-color: {assignment.crew.color}">
