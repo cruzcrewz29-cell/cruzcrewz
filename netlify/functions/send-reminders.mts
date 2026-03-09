@@ -1,7 +1,7 @@
 // netlify/functions/send-reminders.mts
 
 import type { Config } from '@netlify/functions';
-import { sendDailyReminders } from '../../src/lib/sms/reminders.js';
+import { sendDailyReminders } from '../../src/lib/sms/reminder.js';
 
 export default async function handler() {
   console.log('[send-reminders] scheduled function triggered at', new Date().toISOString());
