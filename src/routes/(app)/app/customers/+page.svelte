@@ -16,6 +16,11 @@
   import Briefcase from 'lucide-svelte/icons/briefcase';
   import CirclePlus from 'lucide-svelte/icons/circle-plus';
   import Trash from 'lucide-svelte/icons/trash';
+  import Send from 'lucide-svelte/icons/send';
+  import Building2 from 'lucide-svelte/icons/building-2';
+  import ShieldCheck from 'lucide-svelte/icons/shield-check';
+  import ShieldAlert from 'lucide-svelte/icons/shield-alert';
+  import Loader from 'lucide-svelte/icons/loader';
 
   const SERVICES = [
     'Lawn Mowing',
@@ -23,7 +28,7 @@
     'Bush, Shrub & Tree Care',
     'Spring & Fall Cleanups',
     'Landscape Maintenance',
-	'Lawn Aeration & Overseeding'
+    'Lawn Aeration & Overseeding'
   ];
 
   type Customer = {
@@ -32,9 +37,20 @@
     email: string | null;
     phone: string | null;
     address: string | null;
+    contract_signed: boolean;
+    contract_signed_at: string | null;
     created_at: string;
     job_count?: number;
     total_spent?: number;
+  };
+
+  type Property = {
+    id: string;
+    customer_id: string;
+    address: string;
+    nickname: string | null;
+    lat: number | null;
+    lng: number | null;
   };
 
   type PriceOverride = {
@@ -51,29 +67,38 @@
     price: number | null;
   };
 
-  let customers        = $state<Customer[]>([]);
+  let customers         = $state<Customer[]>([]);
   let filteredCustomers = $state<Customer[]>([]);
-  let loading          = $state(true);
-  let searchQuery      = $state('');
+  let loading           = $state(true);
+  let searchQuery       = $state('');
 
   // Edit/add modal
-  let showModal        = $state(false);
-  let editingCustomer  = $state<Customer | null>(null);
-  let formData         = $state({ name: '', email: '', phone: '', address: '' });
+  let showModal       = $state(false);
+  let editingCustomer = $state<Customer | null>(null);
+  let formData        = $state({ name: '', email: '', phone: '', address: '' });
 
   // Customer detail panel
-  let detailOpen       = $state(false);
-  let detailCustomer   = $state<Customer | null>(null);
-  let detailJobs       = $state<Job[]>([]);
-  let detailOverrides  = $state<PriceOverride[]>([]);
-  let detailLoading    = $state(false);
+  let detailOpen      = $state(false);
+  let detailCustomer  = $state<Customer | null>(null);
+  let detailJobs      = $state<Job[]>([]);
+  let detailOverrides = $state<PriceOverride[]>([]);
+  let detailProperties = $state<Property[]>([]);
+  let detailLoading   = $state(false);
+
+  // Invite
+  let sendingInvite = $state<string | null>(null);
+
+  // Property form
+  let showPropertyForm    = $state(false);
+  let newPropertyAddress  = $state('');
+  let newPropertyNickname = $state('');
+  let savingProperty      = $state(false);
 
   // New override form
   let newOverrideService = $state(SERVICES[0]);
   let newOverridePrice   = $state('');
   let savingOverride     = $state(false);
 
-  // ── Load ────────────────────────────────────────────────────────────────────
   onMount(async () => {
     await loadCustomers();
     loading = false;
@@ -103,21 +128,24 @@
 
     customers = customersData.map(c => ({
       ...c,
-      job_count:   stats[c.id]?.count  || 0,
-      total_spent: stats[c.id]?.total  || 0,
+      job_count:   stats[c.id]?.count || 0,
+      total_spent: stats[c.id]?.total || 0,
     }));
     filteredCustomers = customers;
   }
 
-  // ── Customer detail panel ───────────────────────────────────────────────────
+  // ── Customer detail panel ──────────────────────────────────────────────────
   async function openDetail(customer: Customer) {
     detailCustomer = customer;
     detailOpen = true;
     detailLoading = true;
+    showPropertyForm = false;
+    newPropertyAddress = '';
+    newPropertyNickname = '';
     newOverrideService = SERVICES[0];
     newOverridePrice = '';
 
-    const [jobsRes, overridesRes] = await Promise.all([
+    const [jobsRes, overridesRes, propertiesRes] = await Promise.all([
       supabase
         .from('jobs')
         .select('id, service_type, status, scheduled_date, price')
@@ -128,11 +156,17 @@
         .from('customer_price_overrides')
         .select('id, service_type, price')
         .eq('customer_id', customer.id),
+      supabase
+        .from('properties')
+        .select('*')
+        .eq('customer_id', customer.id)
+        .order('created_at'),
     ]);
 
-    detailJobs      = jobsRes.data  ?? [];
-    detailOverrides = overridesRes.data ?? [];
-    detailLoading   = false;
+    detailJobs       = jobsRes.data      ?? [];
+    detailOverrides  = overridesRes.data ?? [];
+    detailProperties = propertiesRes.data ?? [];
+    detailLoading    = false;
   }
 
   function closeDetail() {
@@ -141,44 +175,83 @@
       detailCustomer = null;
       detailJobs = [];
       detailOverrides = [];
+      detailProperties = [];
     }, 300);
   }
 
+  // ── Invite ─────────────────────────────────────────────────────────────────
+  async function sendInvite(customer: Customer, e: Event) {
+    e.stopPropagation();
+    if (!customer.email) {
+      toast.error('Customer has no email address.');
+      return;
+    }
+    sendingInvite = customer.id;
+    try {
+      const res = await fetch('/api/customer-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: customer.id }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      toast.success(`Portal invite sent to ${customer.email}`);
+    } catch {
+      toast.error('Failed to send invite.');
+    } finally {
+      sendingInvite = null;
+    }
+  }
+
+  // ── Properties ─────────────────────────────────────────────────────────────
+  async function saveProperty() {
+    if (!detailCustomer || !newPropertyAddress.trim()) return;
+    savingProperty = true;
+    try {
+      const { data, error } = await supabase.from('properties').insert({
+        customer_id: detailCustomer.id,
+        address: newPropertyAddress.trim(),
+        nickname: newPropertyNickname.trim() || null,
+      }).select().single();
+
+      if (error) throw error;
+      detailProperties = [...detailProperties, data as Property];
+      newPropertyAddress = '';
+      newPropertyNickname = '';
+      showPropertyForm = false;
+      toast.success('Property added');
+    } catch {
+      toast.error('Failed to add property');
+    } finally {
+      savingProperty = false;
+    }
+  }
+
+  async function deleteProperty(id: string) {
+    await supabase.from('properties').delete().eq('id', id);
+    detailProperties = detailProperties.filter(p => p.id !== id);
+    toast.success('Property removed');
+  }
+
+  // ── Price overrides ────────────────────────────────────────────────────────
   async function saveOverride() {
     if (!detailCustomer || !newOverridePrice || parseFloat(newOverridePrice) <= 0) return;
     savingOverride = true;
-
     try {
-      // Check if override exists for this service
       const existing = detailOverrides.find(o => o.service_type === newOverrideService);
-
       if (existing?.id) {
-        const { error } = await supabase
-          .from('customer_price_overrides')
-          .update({ price: parseFloat(newOverridePrice) })
-          .eq('id', existing.id);
-        if (error) throw error;
+        await supabase.from('customer_price_overrides').update({ price: parseFloat(newOverridePrice) }).eq('id', existing.id);
       } else {
-        const { error } = await supabase
-          .from('customer_price_overrides')
-          .insert({
-            customer_id:  detailCustomer.id,
-            service_type: newOverrideService,
-            price:        parseFloat(newOverridePrice),
-          });
-        if (error) throw error;
+        await supabase.from('customer_price_overrides').insert({
+          customer_id: detailCustomer.id,
+          service_type: newOverrideService,
+          price: parseFloat(newOverridePrice),
+        });
       }
-
-      // Reload overrides
-      const { data } = await supabase
-        .from('customer_price_overrides')
-        .select('id, service_type, price')
-        .eq('customer_id', detailCustomer.id);
+      const { data } = await supabase.from('customer_price_overrides').select('id, service_type, price').eq('customer_id', detailCustomer.id);
       detailOverrides = data ?? [];
-
       newOverridePrice = '';
       toast.success('Price override saved');
-    } catch (err) {
+    } catch {
       toast.error('Failed to save override');
     } finally {
       savingOverride = false;
@@ -191,7 +264,7 @@
     toast.success('Override removed');
   }
 
-  // ── Add/Edit modal ──────────────────────────────────────────────────────────
+  // ── Add/Edit modal ─────────────────────────────────────────────────────────
   function openAddModal() {
     editingCustomer = null;
     formData = { name: '', email: '', phone: '', address: '' };
@@ -203,8 +276,8 @@
     editingCustomer = customer;
     formData = {
       name:    customer.name,
-      email:   customer.email  || '',
-      phone:   customer.phone  || '',
+      email:   customer.email   || '',
+      phone:   customer.phone   || '',
       address: customer.address || '',
     };
     showModal = true;
@@ -213,20 +286,17 @@
   async function handleSubmit(e: Event) {
     e.preventDefault();
     if (!formData.name.trim()) return;
-
     const payload = {
       name:    formData.name.trim(),
       email:   formData.email.trim()   || null,
       phone:   formData.phone.trim()   || null,
       address: formData.address.trim() || null,
     };
-
     if (editingCustomer) {
       await supabase.from('customers').update(payload).eq('id', editingCustomer.id);
     } else {
       await supabase.from('customers').insert(payload);
     }
-
     showModal = false;
     await loadCustomers();
   }
@@ -238,16 +308,16 @@
     await loadCustomers();
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────
   function formatCurrency(n: number) {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
   }
 
   function formatDate(date: string) {
-  return new Date(date.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric'
-  });
-}
+    return new Date(date.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric'
+    });
+  }
 
   function statusColor(status: string) {
     const map: Record<string, string> = {
@@ -312,9 +382,9 @@
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Customer</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Contact</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Contract</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Jobs</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Total Spent</th>
-              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Added</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
             </tr>
           </thead>
@@ -325,12 +395,7 @@
                 onclick={() => openDetail(customer)}
               >
                 <td class="px-6 py-4">
-                  <div class="flex items-center gap-2">
-                    <div class="font-medium text-gray-900">{customer.name}</div>
-                    {#if detailOverrides.length > 0 && detailCustomer?.id === customer.id}
-                      <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Custom Price</span>
-                    {/if}
-                  </div>
+                  <div class="font-medium text-gray-900">{customer.name}</div>
                   {#if customer.address}
                     <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
                       <MapPin class="h-3 w-3" />
@@ -356,16 +421,41 @@
                   {/if}
                 </td>
                 <td class="px-6 py-4">
+                  {#if customer.contract_signed}
+                    <div class="flex items-center gap-1.5 text-emerald-600">
+                      <ShieldCheck class="h-4 w-4" />
+                      <span class="text-xs font-semibold">Signed</span>
+                    </div>
+                  {:else}
+                    <div class="flex items-center gap-1.5 text-amber-500">
+                      <ShieldAlert class="h-4 w-4" />
+                      <span class="text-xs font-semibold">Unsigned</span>
+                    </div>
+                  {/if}
+                </td>
+                <td class="px-6 py-4">
                   <span class="text-sm text-gray-900">{customer.job_count || 0}</span>
                 </td>
                 <td class="px-6 py-4">
                   <span class="text-sm font-medium text-gray-900">{formatCurrency(customer.total_spent || 0)}</span>
                 </td>
                 <td class="px-6 py-4">
-                  <span class="text-sm text-gray-600">{formatDate(customer.created_at)}</span>
-                </td>
-                <td class="px-6 py-4">
                   <div class="flex items-center gap-1">
+                    <!-- Invite button -->
+                    {#if customer.email}
+                      <button
+                        onclick={(e) => sendInvite(customer, e)}
+                        disabled={sendingInvite === customer.id}
+                        class="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        title="Send portal invite"
+                      >
+                        {#if sendingInvite === customer.id}
+                          <Loader class="h-4 w-4 animate-spin" />
+                        {:else}
+                          <Send class="h-4 w-4" />
+                        {/if}
+                      </button>
+                    {/if}
                     <button
                       onclick={(e) => openEditModal(customer, e)}
                       class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
@@ -402,12 +492,35 @@
     <!-- Header -->
     <div class="flex items-center justify-between border-b border-gray-100 bg-gray-900 px-5 py-4">
       <div>
-        <p class="font-bold text-white">{detailCustomer.name}</p>
+        <div class="flex items-center gap-2">
+          <p class="font-bold text-white">{detailCustomer.name}</p>
+          {#if detailCustomer.contract_signed}
+            <ShieldCheck class="h-4 w-4 text-emerald-400" />
+          {:else}
+            <ShieldAlert class="h-4 w-4 text-amber-400" />
+          {/if}
+        </div>
         <p class="text-xs text-gray-400">{detailCustomer.email ?? detailCustomer.phone ?? 'No contact info'}</p>
       </div>
-      <button onclick={closeDetail} class="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
-        <X class="h-5 w-5" />
-      </button>
+      <div class="flex items-center gap-2">
+        {#if detailCustomer.email}
+          <button
+            onclick={(e) => sendInvite(detailCustomer!, e)}
+            disabled={sendingInvite === detailCustomer.id}
+            class="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 transition-colors disabled:opacity-50"
+          >
+            {#if sendingInvite === detailCustomer.id}
+              <Loader class="h-3.5 w-3.5 animate-spin" />
+            {:else}
+              <Send class="h-3.5 w-3.5" />
+            {/if}
+            Invite to Portal
+          </button>
+        {/if}
+        <button onclick={closeDetail} class="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+          <X class="h-5 w-5" />
+        </button>
+      </div>
     </div>
 
     <div class="flex-1 overflow-y-auto">
@@ -425,6 +538,27 @@
             <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center">
               <p class="text-2xl font-extrabold text-emerald-700">{formatCurrency(detailCustomer.total_spent ?? 0)}</p>
               <p class="text-xs text-gray-500 mt-0.5">Total Spent</p>
+            </div>
+          </div>
+
+          <!-- Contract status -->
+          <div class="rounded-xl border {detailCustomer.contract_signed ? 'border-emerald-100 bg-emerald-50' : 'border-amber-100 bg-amber-50'} px-4 py-3">
+            <div class="flex items-center gap-2">
+              {#if detailCustomer.contract_signed}
+                <ShieldCheck class="h-4 w-4 text-emerald-600" />
+                <div>
+                  <p class="text-sm font-semibold text-emerald-800">Service agreement signed</p>
+                  {#if detailCustomer.contract_signed_at}
+                    <p class="text-xs text-emerald-600">{formatDate(detailCustomer.contract_signed_at)}</p>
+                  {/if}
+                </div>
+              {:else}
+                <ShieldAlert class="h-4 w-4 text-amber-600" />
+                <div class="flex-1">
+                  <p class="text-sm font-semibold text-amber-800">No service agreement on file</p>
+                  <p class="text-xs text-amber-600">Send a portal invite to collect signature</p>
+                </div>
+              {/if}
             </div>
           </div>
 
@@ -450,6 +584,82 @@
             {/if}
           </div>
 
+          <!-- ── Properties ── -->
+          <div>
+            <div class="mb-3 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <Building2 class="h-4 w-4 text-gray-500" />
+                <p class="text-sm font-semibold text-gray-900">Properties</p>
+                {#if detailProperties.length > 0}
+                  <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{detailProperties.length}</span>
+                {/if}
+              </div>
+              <button
+                onclick={() => showPropertyForm = !showPropertyForm}
+                class="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+              >
+                <CirclePlus class="h-3.5 w-3.5" />
+                Add Property
+              </button>
+            </div>
+
+            {#if detailProperties.length > 0}
+              <div class="mb-3 overflow-hidden rounded-xl border border-gray-100 divide-y divide-gray-50">
+                {#each detailProperties as property}
+                  <div class="flex items-start justify-between px-4 py-3">
+                    <div class="flex items-start gap-2">
+                      <MapPin class="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        {#if property.nickname}
+                          <p class="text-xs font-semibold text-gray-700">{property.nickname}</p>
+                        {/if}
+                        <p class="text-sm text-gray-600">{property.address}</p>
+                      </div>
+                    </div>
+                    <button
+                      onclick={() => deleteProperty(property.id)}
+                      class="rounded-lg p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                    >
+                      <Trash class="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <p class="mb-3 text-xs text-gray-400">No additional properties. Primary address is used for all jobs.</p>
+            {/if}
+
+            {#if showPropertyForm}
+              <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 space-y-3">
+                <input
+                  type="text"
+                  bind:value={newPropertyNickname}
+                  placeholder="Nickname (e.g. Rental Property, Lake House)"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <input
+                  type="text"
+                  bind:value={newPropertyAddress}
+                  placeholder="Full address *"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <div class="flex gap-2">
+                  <button
+                    onclick={() => showPropertyForm = false}
+                    class="flex-1 rounded-lg border border-gray-200 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors"
+                  >Cancel</button>
+                  <button
+                    onclick={saveProperty}
+                    disabled={savingProperty || !newPropertyAddress.trim()}
+                    class="flex-1 rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  >
+                    {savingProperty ? 'Saving...' : 'Save Property'}
+                  </button>
+                </div>
+              </div>
+            {/if}
+          </div>
+
           <!-- ── Custom Pricing ── -->
           <div>
             <div class="mb-3 flex items-center gap-2">
@@ -460,7 +670,6 @@
               Set a fixed price for this customer that overrides all global rules and lot-size calculations.
             </p>
 
-            <!-- Existing overrides -->
             {#if detailOverrides.length > 0}
               <div class="mb-3 overflow-hidden rounded-xl border border-gray-100">
                 {#each detailOverrides as override}
@@ -480,21 +689,18 @@
               </div>
             {/if}
 
-            <!-- Add override -->
             <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 space-y-3">
               <p class="text-xs font-semibold text-gray-600">
                 {detailOverrides.length > 0 ? 'Add Another Override' : 'Add Price Override'}
               </p>
-              <div class="relative">
-                <select
-                  bind:value={newOverrideService}
-                  class="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  {#each SERVICES as s}
-                    <option value={s}>{s}</option>
-                  {/each}
-                </select>
-              </div>
+              <select
+                bind:value={newOverrideService}
+                class="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                {#each SERVICES as s}
+                  <option value={s}>{s}</option>
+                {/each}
+              </select>
               <div class="flex gap-2">
                 <div class="relative flex-1">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>

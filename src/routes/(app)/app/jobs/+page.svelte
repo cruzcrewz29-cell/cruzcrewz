@@ -13,8 +13,14 @@
 	import CheckCircle from 'lucide-svelte/icons/check-circle';
 	import Clock from 'lucide-svelte/icons/clock';
 	import X from 'lucide-svelte/icons/x';
+	import Camera from 'lucide-svelte/icons/camera';
+	import ChevronLeft from 'lucide-svelte/icons/chevron-left';
+	import ChevronRight from 'lucide-svelte/icons/chevron-right';
+	import Crosshair from 'lucide-svelte/icons/crosshair';
 
-	type Customer = { id: string; name: string; };
+	type Customer = { id: string; name: string; email?: string; };
+
+	type Photo = { url: string; type: 'before' | 'after'; uploaded_at: string; };
 
 	type Job = {
 		id: string;
@@ -26,6 +32,7 @@
 		price: number | null;
 		crew_marked_done: boolean;
 		crew_done_at: string | null;
+		photos: Photo[] | null;
 		customers?: Customer;
 	};
 
@@ -49,6 +56,14 @@
 	// Verify & close state
 	let showVerifyModal = $state(false);
 	let verifyJob = $state<Job | null>(null);
+
+	// Photo lightbox state
+	let showLightbox = $state(false);
+	let lightboxJob = $state<Job | null>(null);
+	let lightboxIndex = $state(0);
+
+	let lightboxPhotos = $derived(lightboxJob?.photos ?? []);
+	let lightboxPhoto = $derived(lightboxPhotos[lightboxIndex] ?? null);
 
 	// Needs review count for header badge
 	let needsReviewCount = $derived(
@@ -81,7 +96,7 @@
 	async function fetchJobs() {
 		const { data } = await supabase
 			.from('jobs')
-			.select('*, customers(name)')
+			.select('*, customers(id, name, email)')
 			.order('scheduled_date');
 		if (data) jobs = data as Job[];
 	}
@@ -111,7 +126,7 @@
 			service_type: job.service_type,
 			description: job.description || '',
 			status: job.status,
-			scheduled_date: job.scheduled_date.split('T')[0],
+			scheduled_date: job.scheduled_date.slice(0, 10),
 			price: job.price?.toString() || ''
 		};
 		showModal = true;
@@ -163,10 +178,10 @@
 	}
 
 	function formatDate(dateStr: string) {
-  return new Date(dateStr.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric'
-  });
-}
+		return new Date(dateStr.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
+			weekday: 'long', month: 'long', day: 'numeric'
+		});
+	}
 
 	function formatTime(date: string) {
 		return new Date(date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -192,6 +207,33 @@
 		fetchJobs();
 	}
 
+	// ── Conquest ──────────────────────────────────────────────────────────────
+	function openConquest(job: Job) {
+		window.open(`/app/conquest/${job.id}`, '_blank');
+	}
+
+	// ── Photo lightbox ────────────────────────────────────────────────────────
+	function openLightbox(job: Job, index = 0) {
+		lightboxJob = job;
+		lightboxIndex = index;
+		showLightbox = true;
+	}
+
+	function lightboxPrev() {
+		lightboxIndex = (lightboxIndex - 1 + lightboxPhotos.length) % lightboxPhotos.length;
+	}
+
+	function lightboxNext() {
+		lightboxIndex = (lightboxIndex + 1) % lightboxPhotos.length;
+	}
+
+	function handleLightboxKey(e: KeyboardEvent) {
+		if (!showLightbox) return;
+		if (e.key === 'ArrowLeft') lightboxPrev();
+		if (e.key === 'ArrowRight') lightboxNext();
+		if (e.key === 'Escape') showLightbox = false;
+	}
+
 	// ── Tracker ───────────────────────────────────────────────────────────────
 	async function sendTracker(job: Job) {
 		sendingTracker = job.id;
@@ -203,7 +245,6 @@
 			});
 			const data = await res.json();
 			if (!data.success) throw new Error(data.error);
-
 			const base = window.location.origin;
 			trackerUrl = `${base}/track/${data.token}`;
 			crewUrl    = `${base}/crew/${data.token}`;
@@ -231,42 +272,39 @@
 		showVerifyModal = true;
 	}
 
-async function confirmComplete(collectPayment: boolean) {
-  if (!verifyJob) return;
+	async function confirmComplete(collectPayment: boolean) {
+		if (!verifyJob) return;
 
-  if (collectPayment && verifyJob.price) {
-    showVerifyModal = false;
-    openPaymentModal(verifyJob);
-    return;
-  }
+		if (collectPayment && verifyJob.price) {
+			showVerifyModal = false;
+			openPaymentModal(verifyJob);
+			return;
+		}
 
-  // Mark completed
-  await supabase
-    .from('jobs')
-    .update({ status: 'completed', crew_marked_done: false })
-    .eq('id', verifyJob.id);
+		await supabase
+			.from('jobs')
+			.update({ status: 'completed', crew_marked_done: false })
+			.eq('id', verifyJob.id);
 
-  // Fire invoice automatically
-  if (verifyJob.price && verifyJob.customers?.email) {
-    fetch('/api/send-invoice', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId: verifyJob.id }),
-    });
-  }
+		if (verifyJob.price && verifyJob.customers?.email) {
+			fetch('/api/send-invoice', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ jobId: verifyJob.id }),
+			});
+		}
 
-  // Auto-create next recurring job
-  fetch('/api/create-recurring-job', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jobId: verifyJob.id }),
-  });
+		fetch('/api/create-recurring-job', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ jobId: verifyJob.id }),
+		});
 
-  toast.success(`${verifyJob.customers?.name ?? 'Job'} marked complete`);
-  showVerifyModal = false;
-  verifyJob = null;
-  await fetchJobs();
-}
+		toast.success(`${verifyJob.customers?.name ?? 'Job'} marked complete`);
+		showVerifyModal = false;
+		verifyJob = null;
+		await fetchJobs();
+	}
 
 	async function dismissCrewFlag(job: Job) {
 		await supabase
@@ -276,6 +314,8 @@ async function confirmComplete(collectPayment: boolean) {
 		await fetchJobs();
 	}
 </script>
+
+<svelte:window onkeydown={handleLightboxKey} />
 
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
@@ -326,6 +366,7 @@ async function confirmComplete(collectPayment: boolean) {
 
 					<div class="p-3 space-y-2 min-h-[500px]">
 						{#each jobsByStatus(column.id) as job (job.id)}
+							{@const jobPhotos = job.photos ?? []}
 							<div
 								draggable="true"
 								ondragstart={(e) => handleDragStart(e, job.id)}
@@ -369,6 +410,16 @@ async function confirmComplete(collectPayment: boolean) {
 												<span class="text-xs text-emerald-600 font-medium">Tracker active</span>
 											</div>
 										{/if}
+										<!-- Photo badge -->
+										{#if jobPhotos.length > 0}
+											<button
+												onclick={() => openLightbox(job, 0)}
+												class="mt-2 flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 hover:bg-gray-200 transition-colors"
+											>
+												<Camera class="h-3 w-3 text-gray-500" />
+												<span class="text-xs text-gray-600 font-medium">{jobPhotos.length} photo{jobPhotos.length !== 1 ? 's' : ''}</span>
+											</button>
+										{/if}
 									</div>
 									<div class="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
 										{#if ['scheduled', 'in_progress'].includes(job.status)}
@@ -386,6 +437,16 @@ async function confirmComplete(collectPayment: boolean) {
 												{:else}
 													<Navigation class="h-3.5 w-3.5" />
 												{/if}
+											</button>
+										{/if}
+										<!-- Conquest button — completed jobs only -->
+										{#if job.status === 'completed'}
+											<button
+												onclick={() => openConquest(job)}
+												class="p-1 text-gray-400 hover:text-emerald-600 rounded"
+												title="Generate Conquest Flyer"
+											>
+												<Crosshair class="h-3.5 w-3.5" />
 											</button>
 										{/if}
 										{#if job.price && job.status !== 'completed'}
@@ -559,8 +620,6 @@ async function confirmComplete(collectPayment: boolean) {
 				</button>
 			</div>
 			<div class="p-6 space-y-4">
-
-				<!-- Crew completion info -->
 				<div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
 					<div class="flex items-center gap-2 mb-1">
 						<div class="h-2 w-2 rounded-full bg-amber-500"></div>
@@ -573,9 +632,26 @@ async function confirmComplete(collectPayment: boolean) {
 					{/if}
 				</div>
 
-				<p class="text-sm text-gray-600">Has the work been completed to your satisfaction?</p>
+				<!-- Photos in verify modal -->
+				{#if (verifyJob.photos ?? []).length > 0}
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Job Photos</p>
+						<div class="grid grid-cols-4 gap-1.5">
+							{#each verifyJob.photos ?? [] as photo, i}
+								<button onclick={() => openLightbox(verifyJob!, i)} class="relative group">
+									<img src={photo.url} alt={photo.type} class="h-16 w-full rounded-lg object-cover" />
+									<div class="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/20 transition-colors"></div>
+									<span class="absolute bottom-1 left-1 rounded text-xs font-bold px-1
+										{photo.type === 'before' ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}">
+										{photo.type}
+									</span>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
 
-				<!-- Action buttons -->
+				<p class="text-sm text-gray-600">Has the work been completed to your satisfaction?</p>
 				<div class="space-y-2">
 					{#if verifyJob.price && verifyJob.status !== 'completed'}
 						<button
@@ -602,6 +678,81 @@ async function confirmComplete(collectPayment: boolean) {
 					</button>
 				</div>
 			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Photo Lightbox -->
+{#if showLightbox && lightboxPhoto}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+		onclick={() => (showLightbox = false)}
+	>
+		<div class="relative max-w-4xl w-full px-4" onclick={(e) => e.stopPropagation()}>
+
+			<!-- Header -->
+			<div class="flex items-center justify-between mb-4">
+				<div class="flex items-center gap-2">
+					<span class="rounded-full px-3 py-1 text-xs font-bold
+						{lightboxPhoto.type === 'before' ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}">
+						{lightboxPhoto.type === 'before' ? 'Before' : 'After'}
+					</span>
+					<span class="text-sm text-gray-400">
+						{lightboxIndex + 1} / {lightboxPhotos.length}
+					</span>
+					{#if lightboxJob}
+						<span class="text-sm text-gray-400">— {lightboxJob.customers?.name} · {lightboxJob.service_type}</span>
+					{/if}
+				</div>
+				<button
+					onclick={() => (showLightbox = false)}
+					class="rounded-lg p-2 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+				>
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			<!-- Image -->
+			<img
+				src={lightboxPhoto.url}
+				alt="{lightboxPhoto.type} photo"
+				class="w-full max-h-[70vh] rounded-xl object-contain"
+			/>
+
+			<!-- Navigation -->
+			{#if lightboxPhotos.length > 1}
+				<div class="flex items-center justify-between mt-4">
+					<button
+						onclick={lightboxPrev}
+						class="flex items-center gap-2 rounded-xl border border-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+					>
+						<ChevronLeft class="h-4 w-4" />
+						Previous
+					</button>
+
+					<!-- Thumbnail strip -->
+					<div class="flex gap-2">
+						{#each lightboxPhotos as photo, i}
+							<button onclick={() => (lightboxIndex = i)}>
+								<img
+									src={photo.url}
+									alt={photo.type}
+									class="h-12 w-12 rounded-lg object-cover transition-all
+										{i === lightboxIndex ? 'ring-2 ring-white opacity-100' : 'opacity-50 hover:opacity-75'}"
+								/>
+							</button>
+						{/each}
+					</div>
+
+					<button
+						onclick={lightboxNext}
+						class="flex items-center gap-2 rounded-xl border border-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+					>
+						Next
+						<ChevronRight class="h-4 w-4" />
+					</button>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}

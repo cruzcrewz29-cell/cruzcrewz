@@ -7,16 +7,25 @@
   import Navigation from 'lucide-svelte/icons/navigation';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import CheckCircle from 'lucide-svelte/icons/check-circle';
+  import Camera from 'lucide-svelte/icons/camera';
+  import Upload from 'lucide-svelte/icons/upload';
+  import X from 'lucide-svelte/icons/x';
+  import ImageIcon from 'lucide-svelte/icons/image';
 
   const token = $page.params.token;
 
+  type Photo = { url: string; type: 'before' | 'after'; uploaded_at: string; };
+
   type TrackerRow = {
     id: string;
+    job_id: string;
     status: string;
     jobs: {
+      id: string;
       service_type: string;
       scheduled_date: string;
       price: number | null;
+      photos: Photo[] | null;
       customers: { name: string; address: string | null; phone: string | null } | null;
     } | null;
   };
@@ -30,10 +39,16 @@
   let lastPing     = $state<string | null>(null);
   let watchId: number | null = null;
 
+  // Photo state
+  let uploadingBefore = $state(false);
+  let uploadingAfter  = $state(false);
+  let photos          = $state<Photo[]>([]);
+  let photoError      = $state('');
+
   onMount(async () => {
     const { data, error: err } = await supabase
       .from('tracker_tokens')
-      .select(`id, status, jobs ( service_type, scheduled_date, price, customers ( name, address, phone ) )`)
+      .select(`id, job_id, status, jobs ( id, service_type, scheduled_date, price, photos, customers ( name, address, phone ) )`)
       .eq('token', token)
       .single();
 
@@ -47,40 +62,31 @@
       ...data,
       jobs: Array.isArray(data.jobs) ? data.jobs[0] : data.jobs,
     } as TrackerRow;
+
+    photos = tracker.jobs?.photos ?? [];
     loading = false;
   });
 
-  onDestroy(() => {
-    stopGPS();
-  });
+  onDestroy(() => { stopGPS(); });
 
   async function setStatus(status: string) {
     if (!tracker) return;
     updating = true;
-
     await fetch('/api/update-tracker', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, status }),
     });
-
     tracker = { ...tracker, status };
-
-    // Auto-start GPS when "on the way"
     if (status === 'on_the_way') startGPS();
     if (status === 'arrived' || status === 'completed') stopGPS();
-
     updating = false;
   }
 
   function startGPS() {
-    if (!navigator.geolocation) {
-      gpsError = 'GPS not available on this device.';
-      return;
-    }
+    if (!navigator.geolocation) { gpsError = 'GPS not available on this device.'; return; }
     gpsActive = true;
     gpsError = '';
-
     watchId = navigator.geolocation.watchPosition(
       async (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
@@ -91,29 +97,90 @@
         });
         lastPing = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       },
-      (err) => {
-        gpsError = 'GPS error — location sharing paused.';
-        gpsActive = false;
-        console.error('[gps]', err);
-      },
+      (err) => { gpsError = 'GPS error — location sharing paused.'; gpsActive = false; },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
   }
 
   function stopGPS() {
-    if (watchId != null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-    }
+    if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
     gpsActive = false;
   }
 
   function openNav() {
     const address = tracker?.jobs?.customers?.address;
     if (!address) return;
-    const encoded = encodeURIComponent(address);
-    window.open(`https://maps.google.com/maps?daddr=${encoded}`);
+    window.open(`https://maps.google.com/maps?daddr=${encodeURIComponent(address)}`);
   }
+
+  // ── Photo upload ──────────────────────────────────────────────────────────
+  async function uploadPhoto(e: Event, type: 'before' | 'after') {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !tracker?.jobs?.id) return;
+
+    if (type === 'before') uploadingBefore = true;
+    else uploadingAfter = true;
+    photoError = '';
+
+    try {
+      const ext  = file.name.split('.').pop() ?? 'jpg';
+      const path = `${tracker.jobs.id}/${type}-${Date.now()}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('job-photos')
+        .upload(path, file, { upsert: false });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage
+        .from('job-photos')
+        .getPublicUrl(path);
+
+      const newPhoto: Photo = {
+        url: urlData.publicUrl,
+        type,
+        uploaded_at: new Date().toISOString(),
+      };
+
+      const updatedPhotos = [...photos, newPhoto];
+
+      const { error: dbErr } = await supabase
+        .from('jobs')
+        .update({ photos: updatedPhotos })
+        .eq('id', tracker.jobs.id);
+
+      if (dbErr) throw dbErr;
+
+      photos = updatedPhotos;
+    } catch (err) {
+      console.error('[uploadPhoto]', err);
+      photoError = 'Upload failed. Please try again.';
+    } finally {
+      if (type === 'before') uploadingBefore = false;
+      else uploadingAfter = false;
+      input.value = '';
+    }
+  }
+
+  function removePhoto(photo: Photo) {
+    // Just remove from local state — keep in storage for audit trail
+    photos = photos.filter(p => p.url !== photo.url);
+    if (tracker?.jobs?.id) {
+      supabase.from('jobs').update({ photos }).eq('id', tracker.jobs.id);
+    }
+  }
+
+  let beforePhotos = $derived(photos.filter(p => p.type === 'before'));
+  let afterPhotos  = $derived(photos.filter(p => p.type === 'after'));
+
+  // Show before upload after arrived, after upload after arrived too (can upload both)
+  let canUploadBefore = $derived(
+    tracker?.status === 'arrived' || tracker?.status === 'completed'
+  );
+  let canUploadAfter = $derived(
+    tracker?.status === 'arrived' || tracker?.status === 'completed'
+  );
 </script>
 
 <svelte:head>
@@ -198,7 +265,7 @@
                 : 'bg-blue-600 text-white hover:bg-blue-500'}"
           >
             {#if updating}<Loader class="h-4 w-4 animate-spin" />{/if}
-            {tracker.status === 'on_the_way' ? '🚗 On the Way (active)' : '🚗 On My Way'}
+            {tracker.status === 'on_the_way' ? 'On the Way (active)' : 'On My Way'}
           </button>
         {/if}
 
@@ -212,8 +279,100 @@
                 : 'bg-emerald-600 text-white hover:bg-emerald-500'}"
           >
             {#if updating}<Loader class="h-4 w-4 animate-spin" />{/if}
-            {tracker.status === 'arrived' ? '✅ Arrived (active)' : '✅ I\'ve Arrived'}
+            {tracker.status === 'arrived' ? 'Arrived (active)' : "I've Arrived"}
           </button>
+        {/if}
+
+        <!-- Photo upload — unlocks after arrived -->
+        {#if canUploadBefore || canUploadAfter}
+          <div class="rounded-2xl border border-gray-700 bg-gray-800 p-4 space-y-4">
+            <div class="flex items-center gap-2">
+              <Camera class="h-4 w-4 text-gray-400" />
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Job Photos</p>
+            </div>
+
+            <!-- Before photos -->
+            <div class="space-y-2">
+              <p class="text-xs font-medium text-gray-300">Before</p>
+              {#if beforePhotos.length > 0}
+                <div class="grid grid-cols-3 gap-2">
+                  {#each beforePhotos as photo}
+                    <div class="relative">
+                      <img src={photo.url} alt="Before" class="h-20 w-full rounded-lg object-cover" />
+                      <button
+                        onclick={() => removePhoto(photo)}
+                        class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white"
+                      >
+                        <X class="h-3 w-3" />
+                      </button>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+              {#if canUploadBefore}
+                <label class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-600 py-3 text-sm font-medium text-gray-400 hover:border-gray-400 hover:text-gray-300 transition-colors">
+                  {#if uploadingBefore}
+                    <Loader class="h-4 w-4 animate-spin" />
+                    Uploading...
+                  {:else}
+                    <Upload class="h-4 w-4" />
+                    Add Before Photo
+                  {/if}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    class="hidden"
+                    onchange={(e) => uploadPhoto(e, 'before')}
+                    disabled={uploadingBefore}
+                  />
+                </label>
+              {/if}
+            </div>
+
+            <!-- After photos -->
+            <div class="space-y-2">
+              <p class="text-xs font-medium text-gray-300">After</p>
+              {#if afterPhotos.length > 0}
+                <div class="grid grid-cols-3 gap-2">
+                  {#each afterPhotos as photo}
+                    <div class="relative">
+                      <img src={photo.url} alt="After" class="h-20 w-full rounded-lg object-cover" />
+                      <button
+                        onclick={() => removePhoto(photo)}
+                        class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white"
+                      >
+                        <X class="h-3 w-3" />
+                      </button>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+              {#if canUploadAfter}
+                <label class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-600 py-3 text-sm font-medium text-gray-400 hover:border-gray-400 hover:text-gray-300 transition-colors">
+                  {#if uploadingAfter}
+                    <Loader class="h-4 w-4 animate-spin" />
+                    Uploading...
+                  {:else}
+                    <Upload class="h-4 w-4" />
+                    Add After Photo
+                  {/if}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    class="hidden"
+                    onchange={(e) => uploadPhoto(e, 'after')}
+                    disabled={uploadingAfter}
+                  />
+                </label>
+              {/if}
+            </div>
+
+            {#if photoError}
+              <p class="text-xs text-red-400">{photoError}</p>
+            {/if}
+          </div>
         {/if}
 
         {#if tracker.status === 'arrived'}
@@ -223,7 +382,7 @@
             class="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-100 py-4 text-base font-bold text-gray-900 hover:bg-white transition-colors"
           >
             {#if updating}<Loader class="h-4 w-4 animate-spin text-gray-700" />{/if}
-            🎉 Mark Job Complete
+            Mark Job Complete
           </button>
         {/if}
 
@@ -232,6 +391,9 @@
             <CheckCircle class="h-10 w-10 text-emerald-400" />
             <p class="mt-2 text-lg font-bold text-emerald-400">Job Complete!</p>
             <p class="mt-1 text-xs text-gray-400">Great work. The customer has been notified.</p>
+            {#if photos.length > 0}
+              <p class="mt-1 text-xs text-gray-400">{photos.length} photo{photos.length !== 1 ? 's' : ''} uploaded.</p>
+            {/if}
           </div>
         {/if}
       </div>
