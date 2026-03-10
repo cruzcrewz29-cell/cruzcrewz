@@ -354,6 +354,7 @@
           email: formData.email, phone: formData.phone, address: fullAddress,
           sms_opt_in: formData.smsOptIn,
           sms_opt_in_at: formData.smsOptIn ? new Date().toISOString() : null,
+          frequency: formData.frequency,
         }).select().single();
         if (ce) throw ce;
         customerId = nc.id;
@@ -366,6 +367,7 @@
         scheduled_date: formData.startDate || new Date().toISOString(),
         price:          estimatedPrice,
         customer_phone: formData.phone,
+        frequency: formData.frequency,
       }).select().single();
       if (je) throw je;
       contractData = {

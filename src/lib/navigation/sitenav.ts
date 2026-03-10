@@ -6,6 +6,7 @@ import Users from 'lucide-svelte/icons/users';
 import Settings from 'lucide-svelte/icons/settings';
 import ImageIcon from 'lucide-svelte/icons/image';
 import MessageSquare from 'lucide-svelte/icons/message-square';
+import MessagesSquare from 'lucide-svelte/icons/messages-square';
 import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
 import DollarSign from 'lucide-svelte/icons/dollar-sign';
 import RouteIcon from 'lucide-svelte/icons/route';
@@ -25,6 +26,7 @@ export const SITE_NAV: NavItem[] = [
   { label: 'Calendar',     href: '/app/calendar',       section: 'Calendar',     icon: Calendar },
   { label: 'Jobs',         href: '/app/jobs',           section: 'Jobs',         icon: ClipboardList },
   { label: 'Customers',    href: '/app/customers',      section: 'Customers',    icon: Users },
+  { label: 'Messages',     href: '/app/messages',       section: 'Messages',     icon: MessagesSquare },
   { label: 'Routes',       href: '/app/routes',         section: 'Routes',       icon: RouteIcon },
   { label: 'Heat Map',     href: '/app/heatmap',        section: 'Heat Map',     icon: MapPin },
   { label: 'Leaderboard',  href: '/app/leaderboard',    section: 'Leaderboard',  icon: Trophy },

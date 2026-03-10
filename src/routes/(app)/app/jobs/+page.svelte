@@ -231,27 +231,42 @@
 		showVerifyModal = true;
 	}
 
-	async function confirmComplete(collectPayment: boolean) {
-		if (!verifyJob) return;
+async function confirmComplete(collectPayment: boolean) {
+  if (!verifyJob) return;
 
-		if (collectPayment && verifyJob.price) {
-			// Close verify modal and open payment modal
-			showVerifyModal = false;
-			openPaymentModal(verifyJob);
-			return;
-		}
+  if (collectPayment && verifyJob.price) {
+    showVerifyModal = false;
+    openPaymentModal(verifyJob);
+    return;
+  }
 
-		// Mark completed directly
-		await supabase
-			.from('jobs')
-			.update({ status: 'completed', crew_marked_done: false })
-			.eq('id', verifyJob.id);
+  // Mark completed
+  await supabase
+    .from('jobs')
+    .update({ status: 'completed', crew_marked_done: false })
+    .eq('id', verifyJob.id);
 
-		toast.success(`${verifyJob.customers?.name ?? 'Job'} marked complete`);
-		showVerifyModal = false;
-		verifyJob = null;
-		await fetchJobs();
-	}
+  // Fire invoice automatically
+  if (verifyJob.price && verifyJob.customers?.email) {
+    fetch('/api/send-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: verifyJob.id }),
+    });
+  }
+
+  // Auto-create next recurring job
+  fetch('/api/create-recurring-job', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobId: verifyJob.id }),
+  });
+
+  toast.success(`${verifyJob.customers?.name ?? 'Job'} marked complete`);
+  showVerifyModal = false;
+  verifyJob = null;
+  await fetchJobs();
+}
 
 	async function dismissCrewFlag(job: Job) {
 		await supabase
