@@ -70,7 +70,7 @@ export const POST: RequestHandler = async ({ request }) => {
         .update({ status: 'confirmed' })
         .eq('id', job.id);
 
-      const dateLabel = new Date(job.scheduled_date).toLocaleDateString('en-US', {
+      const dateLabel = new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', {
         weekday: 'long', month: 'short', day: 'numeric', timeZone: 'America/Chicago'
       });
 

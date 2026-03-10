@@ -45,14 +45,11 @@
 	}
 
 	function formatDate(date: string) {
-		return new Date(date).toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit'
-		});
-	}
+  return new Date(date.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
 
 	function generateQRUrl(campaign: string) {
 		return `${window.location.origin}/qr/${campaign}`;

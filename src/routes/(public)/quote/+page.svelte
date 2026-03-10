@@ -39,7 +39,7 @@
   // ── Form state ───────────────────────────────────────────────────────────
   let currentStep = $state(1);
 
-  let formData = $state({
+ let formData = $state({
     selectedService: '',
     address: '',
     city: '',
@@ -52,6 +52,7 @@
     frequency: 'weekly',
     startDate: '',
     additionalNotes: '',
+    smsOptIn: false,
   });
 
   // Step 3 service-specific inputs
@@ -341,10 +342,18 @@
       const { data: existing } = await supabase.from('customers').select('id').eq('email', formData.email).single();
       if (existing) {
         customerId = existing.id;
+        if (formData.smsOptIn) {
+          await supabase.from('customers').update({
+            sms_opt_in: true,
+            sms_opt_in_at: new Date().toISOString(),
+          }).eq('id', existing.id);
+        }
       } else {
         const { data: nc, error: ce } = await supabase.from('customers').insert({
           name: `${formData.firstName} ${formData.lastName}`,
           email: formData.email, phone: formData.phone, address: fullAddress,
+          sms_opt_in: formData.smsOptIn,
+          sms_opt_in_at: formData.smsOptIn ? new Date().toISOString() : null,
         }).select().single();
         if (ce) throw ce;
         customerId = nc.id;
@@ -979,6 +988,22 @@
               </div>
               {#if errors.phone}<p class="mt-1 text-xs text-red-500">{errors.phone}</p>{/if}
               <p class="mt-1.5 text-xs text-gray-400">We'll only call to confirm your appointment.</p>
+  <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            bind:checked={formData.smsOptIn}
+            class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-green-600 focus:ring-green-500"
+          />
+          <span class="text-xs text-gray-600 leading-relaxed">
+            Cruz Crewz LLC would like your consent to send text message communications from +18668732789
+            to the mobile number listed above, regarding informational and marketing messages.
+            Consent is not a condition of purchase. Message frequency varies. Message and data rates may apply.
+            Reply STOP to unsubscribe at any time. Reply HELP for assistance.
+            We do not share your mobile opt-in information with anyone.
+                  </span>
+                </label>
+              </div>
             </div>
           </div>
 

@@ -10,6 +10,9 @@
 	import CreditCard from 'lucide-svelte/icons/credit-card';
 	import Navigation from 'lucide-svelte/icons/navigation';
 	import Copy from 'lucide-svelte/icons/copy';
+	import CheckCircle from 'lucide-svelte/icons/check-circle';
+	import Clock from 'lucide-svelte/icons/clock';
+	import X from 'lucide-svelte/icons/x';
 
 	type Customer = { id: string; name: string; };
 
@@ -21,6 +24,8 @@
 		status: string;
 		scheduled_date: string;
 		price: number | null;
+		crew_marked_done: boolean;
+		crew_done_at: string | null;
 		customers?: Customer;
 	};
 
@@ -33,13 +38,22 @@
 	let paymentJob = $state<Job | null>(null);
 
 	// Tracker state
-	let trackerLinks = $state<Record<string, string>>({}); // jobId → tracker URL
+	let trackerLinks = $state<Record<string, string>>({});
 	let sendingTracker = $state<string | null>(null);
 	let showTrackerModal = $state(false);
 	let trackerModalJob = $state<Job | null>(null);
 	let trackerUrl = $state('');
 	let crewUrl = $state('');
 	let copied = $state<'tracker' | 'crew' | null>(null);
+
+	// Verify & close state
+	let showVerifyModal = $state(false);
+	let verifyJob = $state<Job | null>(null);
+
+	// Needs review count for header badge
+	let needsReviewCount = $derived(
+		jobs.filter(j => j.crew_marked_done && j.status !== 'completed').length
+	);
 
 	const STATUS_OPTIONS = ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'];
 
@@ -110,7 +124,7 @@
 			service_type: formData.service_type,
 			description: formData.description || null,
 			status: formData.status,
-			scheduled_date: new Date(formData.scheduled_date).toISOString(),
+			scheduled_date: formData.scheduled_date,
 			price: formData.price ? Number(formData.price) : null
 		};
 		if (editingJob) {
@@ -148,8 +162,14 @@
 		return jobs.filter(j => j.status === 'completed' && j.price).reduce((sum, j) => sum + Number(j.price), 0);
 	}
 
-	function formatDate(date: string) {
-		return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+	function formatDate(dateStr: string) {
+  return new Date(dateStr.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric'
+  });
+}
+
+	function formatTime(date: string) {
+		return new Date(date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 	}
 
 	function formatCurrency(amount: number) {
@@ -204,11 +224,57 @@
 		setTimeout(() => (copied = null), 2000);
 		toast.success(type === 'tracker' ? 'Customer link copied!' : 'Crew link copied!');
 	}
+
+	// ── Verify & Close ────────────────────────────────────────────────────────
+	function openVerifyModal(job: Job) {
+		verifyJob = job;
+		showVerifyModal = true;
+	}
+
+	async function confirmComplete(collectPayment: boolean) {
+		if (!verifyJob) return;
+
+		if (collectPayment && verifyJob.price) {
+			// Close verify modal and open payment modal
+			showVerifyModal = false;
+			openPaymentModal(verifyJob);
+			return;
+		}
+
+		// Mark completed directly
+		await supabase
+			.from('jobs')
+			.update({ status: 'completed', crew_marked_done: false })
+			.eq('id', verifyJob.id);
+
+		toast.success(`${verifyJob.customers?.name ?? 'Job'} marked complete`);
+		showVerifyModal = false;
+		verifyJob = null;
+		await fetchJobs();
+	}
+
+	async function dismissCrewFlag(job: Job) {
+		await supabase
+			.from('jobs')
+			.update({ crew_marked_done: false })
+			.eq('id', job.id);
+		await fetchJobs();
+	}
 </script>
 
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-semibold text-gray-900">Jobs</h1>
+		<div class="flex items-center gap-3">
+			<h1 class="text-2xl font-semibold text-gray-900">Jobs</h1>
+			{#if needsReviewCount > 0}
+				<div class="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1">
+					<div class="h-2 w-2 animate-pulse rounded-full bg-amber-500"></div>
+					<span class="text-xs font-semibold text-amber-700">
+						{needsReviewCount} need{needsReviewCount === 1 ? 's' : ''} review
+					</span>
+				</div>
+			{/if}
+		</div>
 		<div class="flex items-center gap-4">
 			<div class="text-right">
 				<p class="text-xs text-gray-500">Completed Revenue</p>
@@ -248,8 +314,28 @@
 							<div
 								draggable="true"
 								ondragstart={(e) => handleDragStart(e, job.id)}
-								class="bg-white border border-gray-200 rounded-lg p-3 cursor-move hover:shadow-md transition-shadow group break-words"
+								class="bg-white border rounded-lg p-3 cursor-move hover:shadow-md transition-shadow group break-words
+									{job.crew_marked_done && job.status !== 'completed'
+										? 'border-amber-300 ring-1 ring-amber-200'
+										: 'border-gray-200'}"
 							>
+								<!-- Crew done banner -->
+								{#if job.crew_marked_done && job.status !== 'completed'}
+									<button
+										onclick={() => openVerifyModal(job)}
+										class="mb-2 flex w-full items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-left hover:bg-amber-100 transition-colors"
+									>
+										<div class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500"></div>
+										<div class="flex-1 min-w-0">
+											<p class="text-xs font-semibold text-amber-800">Crew says done</p>
+											{#if job.crew_done_at}
+												<p class="text-xs text-amber-600">{formatTime(job.crew_done_at)}</p>
+											{/if}
+										</div>
+										<span class="text-xs font-semibold text-amber-700 shrink-0">Verify →</span>
+									</button>
+								{/if}
+
 								<div class="flex items-start justify-between">
 									<div class="flex-1 min-w-0 break-words">
 										<div class="font-medium text-sm text-gray-900 break-words">
@@ -262,7 +348,6 @@
 												{formatCurrency(job.price)}
 											</div>
 										{/if}
-										<!-- Tracker active indicator -->
 										{#if trackerLinks[job.id]}
 											<div class="mt-2 flex items-center gap-1">
 												<div class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
@@ -271,7 +356,6 @@
 										{/if}
 									</div>
 									<div class="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
-										<!-- Tracker button — only for scheduled/in_progress -->
 										{#if ['scheduled', 'in_progress'].includes(job.status)}
 											<button
 												onclick={() => sendTracker(job)}
@@ -400,13 +484,16 @@
 {#if showTrackerModal && trackerModalJob}
 	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={() => (showTrackerModal = false)}>
 		<div class="bg-white rounded-xl shadow-xl max-w-md w-full" onclick={(e) => e.stopPropagation()}>
-			<div class="px-6 py-4 border-b border-gray-200">
-				<h2 class="text-lg font-semibold text-gray-900">Live Tracker Created</h2>
-				<p class="text-sm text-gray-500 mt-0.5">{trackerModalJob.customers?.name} — {trackerModalJob.service_type}</p>
+			<div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+				<div>
+					<h2 class="text-lg font-semibold text-gray-900">Live Tracker Created</h2>
+					<p class="text-sm text-gray-500 mt-0.5">{trackerModalJob.customers?.name} — {trackerModalJob.service_type}</p>
+				</div>
+				<button onclick={() => (showTrackerModal = false)} class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
+					<X class="h-4 w-4" />
+				</button>
 			</div>
 			<div class="p-6 space-y-4">
-
-				<!-- Customer link -->
 				<div>
 					<p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Tracker Link</p>
 					<p class="mb-2 text-xs text-gray-400">Send this to the customer so they can track the crew in real time.</p>
@@ -414,34 +501,91 @@
 						<input type="text" readonly value={trackerUrl}
 							class="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700" />
 						<button onclick={() => copyLink('tracker')}
-							class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+							class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
 							<Copy class="h-3.5 w-3.5" />
 							{copied === 'tracker' ? 'Copied!' : 'Copy'}
 						</button>
 					</div>
 				</div>
-
-				<!-- Crew link -->
 				<div>
 					<p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Crew App Link</p>
-					<p class="mb-2 text-xs text-gray-400">Send this to the crew member's phone. They'll use it to update status and share GPS.</p>
+					<p class="mb-2 text-xs text-gray-400">Send this to the crew member's phone.</p>
 					<div class="flex items-center gap-2">
 						<input type="text" readonly value={crewUrl}
 							class="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700" />
 						<button onclick={() => copyLink('crew')}
-							class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+							class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
 							<Copy class="h-3.5 w-3.5" />
 							{copied === 'crew' ? 'Copied!' : 'Copy'}
 						</button>
 					</div>
 				</div>
-
 				<div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
 					<p class="text-xs text-blue-700">The customer link auto-refreshes every 15 seconds. The crew link works on any phone — no app install needed.</p>
 				</div>
-
 				<button onclick={() => (showTrackerModal = false)}
 					class="w-full rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white hover:bg-gray-800">Done</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Verify & Close Modal -->
+{#if showVerifyModal && verifyJob}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={() => (showVerifyModal = false)}>
+		<div class="bg-white rounded-xl shadow-xl max-w-sm w-full" onclick={(e) => e.stopPropagation()}>
+			<div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+				<div>
+					<h2 class="text-lg font-semibold text-gray-900">Verify & Close Job</h2>
+					<p class="text-sm text-gray-500 mt-0.5">{verifyJob.customers?.name} — {verifyJob.service_type}</p>
+				</div>
+				<button onclick={() => (showVerifyModal = false)} class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
+					<X class="h-4 w-4" />
+				</button>
+			</div>
+			<div class="p-6 space-y-4">
+
+				<!-- Crew completion info -->
+				<div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+					<div class="flex items-center gap-2 mb-1">
+						<div class="h-2 w-2 rounded-full bg-amber-500"></div>
+						<p class="text-sm font-semibold text-amber-900">Crew marked this job done</p>
+					</div>
+					{#if verifyJob.crew_done_at}
+						<p class="text-xs text-amber-700 ml-4">
+							Completed at {formatTime(verifyJob.crew_done_at)} on {formatDate(verifyJob.crew_done_at)}
+						</p>
+					{/if}
+				</div>
+
+				<p class="text-sm text-gray-600">Has the work been completed to your satisfaction?</p>
+
+				<!-- Action buttons -->
+				<div class="space-y-2">
+					{#if verifyJob.price && verifyJob.status !== 'completed'}
+						<button
+							onclick={() => confirmComplete(true)}
+							class="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition-colors"
+						>
+							<CreditCard class="h-4 w-4" />
+							Collect Payment & Mark Complete
+						</button>
+					{/if}
+					<button
+						onclick={() => confirmComplete(false)}
+						class="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+					>
+						<CheckCircle class="h-4 w-4" />
+						Mark Complete (no payment)
+					</button>
+					<button
+						onclick={() => { showVerifyModal = false; dismissCrewFlag(verifyJob!); }}
+						class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+					>
+						<Clock class="h-4 w-4" />
+						Not done yet — dismiss flag
+					</button>
+				</div>
 			</div>
 		</div>
 	</div>

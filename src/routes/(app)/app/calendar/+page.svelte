@@ -106,7 +106,7 @@
 			service_type: formData.service_type,
 			description: formData.description || null,
 			status: formData.status,
-			scheduled_date: new Date(formData.scheduled_date).toISOString(),
+			scheduled_date: formData.scheduled_date,
 			price: formData.price ? Number(formData.price) : null
 		};
 
@@ -208,11 +208,10 @@
 	}
 
 	function formatDate(date: string) {
-		return new Date(date).toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric'
-		});
-	}
+  return new Date(date.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric'
+  });
+}
 
 	$effect(() => {
 		if (view === 'calendar' && !loading && calendarEl) {

@@ -44,7 +44,7 @@ export const load: PageServerLoad = async ({ params }) => {
   }
 
   // Quote expired (older than 30 days and still pending)
-  const createdDate = new Date(job.scheduled_date);
+  const createdDate = new Date(job.scheduled_date + 'T12:00:00');
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const isExpired = job.status === 'pending' && createdDate < thirtyDaysAgo;

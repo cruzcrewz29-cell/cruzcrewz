@@ -119,7 +119,7 @@
             <div class="font-semibold break-words">{job.service_type}</div>
             <div class="text-sm text-gray-600 break-words">{job.description}</div>
             <div class="text-sm mt-2 break-words">
-              {new Date(job.scheduled_date).toLocaleDateString()}
+              {new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString()}
             </div>
             <div class="text-sm font-bold mt-1">
               ${job.price}

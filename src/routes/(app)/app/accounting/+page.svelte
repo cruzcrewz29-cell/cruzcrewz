@@ -752,7 +752,7 @@
                   <td class="px-6 py-3 font-medium text-gray-900">{job.customers?.name ?? 'Unknown'}</td>
                   <td class="px-6 py-3 text-gray-600">{job.service_type}</td>
                   <td class="px-6 py-3 text-gray-500">
-                    {new Date(job.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </td>
                   <td class="px-6 py-3">
                     <span class="rounded-full px-2 py-0.5 text-xs font-medium {statusBadge(job.status)}">

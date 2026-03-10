@@ -111,7 +111,7 @@ export function buildReminderMessage(job: ReminderJob, weather: WeatherSummary, 
   const serviceShort = shortServiceName(job.service_type);
   const dateLabel   = hoursOut === 48 ? 'tomorrow' : 'today';
 
-  const date = new Date(job.scheduled_date);
+  const date = new Date(job.scheduled_date + 'T12:00:00');
   const dayName = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Chicago' });
 
   const lines: string[] = [];

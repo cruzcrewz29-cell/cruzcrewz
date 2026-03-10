@@ -86,10 +86,10 @@
   }
 
   function formatDate(dateStr: string) {
-    return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
-      weekday: 'long', month: 'long', day: 'numeric'
-    });
-  }
+  return new Date(dateStr.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric'
+  });
+}
 </script>
 
 <svelte:head>

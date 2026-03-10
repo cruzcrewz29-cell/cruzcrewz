@@ -207,7 +207,7 @@
             {/if}
             <div class="flex items-center gap-2 text-gray-700">
               <Clock class="h-4 w-4 text-gray-400 shrink-0" />
-              <span>{new Date(job.scheduled_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+              <span>{new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
             </div>
           </div>
         </div>

@@ -32,7 +32,7 @@ QUOTE DETAILS:
 - Service: ${job.service_type}
 - Quoted price: ${job.price ? `$${job.price}` : 'custom quote'}
 - Quote sent: ${days} day${days !== 1 ? 's' : ''} ago
-- Scheduled for: ${new Date(job.scheduled_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+- Scheduled for: ${new Date(job.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
 ${job.description ? `- Notes: ${job.description}` : ''}
 
 CONTEXT:
