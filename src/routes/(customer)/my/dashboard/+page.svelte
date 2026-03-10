@@ -1,7 +1,6 @@
 <script lang="ts">
   // src/routes/(customer)/my/dashboard/+page.svelte
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
   import Loader from 'lucide-svelte/icons/loader';
   import Calendar from 'lucide-svelte/icons/calendar';
   import CheckCircle from 'lucide-svelte/icons/check-circle';
@@ -39,7 +38,7 @@
 
   onMount(async () => {
     // Read token from URL or localStorage
-    const urlToken = $page.url.searchParams.get('token');
+    const urlToken = new URLSearchParams(window.location.search).get('token');
     if (urlToken) {
       localStorage.setItem('cruzcrewz_customer_token', urlToken);
       // Clean URL
