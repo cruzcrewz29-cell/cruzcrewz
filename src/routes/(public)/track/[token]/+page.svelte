@@ -7,7 +7,7 @@
   import Clock from 'lucide-svelte/icons/clock';
   import CheckCircle from 'lucide-svelte/icons/check-circle';
   import Loader from 'lucide-svelte/icons/loader';
-
+  import Car from 'lucide-svelte/icons/car';
   const token = $page.params.token;
 
   type TrackerData = {
@@ -31,10 +31,10 @@
   let pollInterval: ReturnType<typeof setInterval>;
 
   const STATUS_LABELS: Record<string, { label: string; color: string; icon: string }> = {
-    pending:     { label: 'Crew is being dispatched',   color: 'text-gray-600',   icon: '🕐' },
-    on_the_way:  { label: 'Crew is on the way!',        color: 'text-blue-600',   icon: '🚗' },
-    arrived:     { label: 'Crew has arrived',           color: 'text-emerald-600', icon: '✅' },
-    completed:   { label: 'Job completed!',             color: 'text-emerald-700', icon: '🎉' },
+    pending:     { label: 'Crew is being dispatched',   color: 'text-gray-600',   icon: 'clock' },
+    on_the_way:  { label: 'Crew is on the way!',        color: 'text-blue-600',   icon: 'car' },
+    arrived:     { label: 'Crew has arrived',           color: 'text-emerald-600', icon: 'map-pin' },
+    completed:   { label: 'Job completed!',             color: 'text-emerald-700', icon: 'check-circle' },
   };
 
   onMount(async () => {

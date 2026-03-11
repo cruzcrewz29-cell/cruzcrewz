@@ -21,6 +21,8 @@
   import ShieldCheck from 'lucide-svelte/icons/shield-check';
   import ShieldAlert from 'lucide-svelte/icons/shield-alert';
   import Loader from 'lucide-svelte/icons/loader';
+  import CreditCard from 'lucide-svelte/icons/credit-card';
+  import FileText from 'lucide-svelte/icons/file-text';
 
   const SERVICES = [
     'Lawn Mowing',
@@ -39,6 +41,7 @@
     address: string | null;
     contract_signed: boolean;
     contract_signed_at: string | null;
+    billing_mode: 'card' | 'invoice' | null;
     created_at: string;
     job_count?: number;
     total_spent?: number;
@@ -85,6 +88,9 @@
   let detailProperties = $state<Property[]>([]);
   let detailLoading   = $state(false);
 
+  // Billing mode toggle state
+  let savingBillingMode = $state(false);
+
   // Invite
   let sendingInvite = $state<string | null>(null);
 
@@ -128,6 +134,7 @@
 
     customers = customersData.map(c => ({
       ...c,
+      billing_mode: c.billing_mode ?? 'card',
       job_count:   stats[c.id]?.count || 0,
       total_spent: stats[c.id]?.total || 0,
     }));
@@ -177,6 +184,41 @@
       detailOverrides = [];
       detailProperties = [];
     }, 300);
+  }
+
+  // ── Billing mode toggle ────────────────────────────────────────────────────
+  async function toggleBillingMode(newMode: 'card' | 'invoice') {
+    if (!detailCustomer || savingBillingMode) return;
+    if (detailCustomer.billing_mode === newMode) return;
+
+    savingBillingMode = true;
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({ billing_mode: newMode })
+        .eq('id', detailCustomer.id);
+
+      if (error) throw error;
+
+      // Update local state
+      detailCustomer = { ...detailCustomer, billing_mode: newMode };
+      customers = customers.map(c =>
+        c.id === detailCustomer!.id ? { ...c, billing_mode: newMode } : c
+      );
+      filteredCustomers = filteredCustomers.map(c =>
+        c.id === detailCustomer!.id ? { ...c, billing_mode: newMode } : c
+      );
+
+      toast.success(
+        newMode === 'invoice'
+          ? `${detailCustomer.name} switched to invoice billing`
+          : `${detailCustomer.name} switched to card on file`
+      );
+    } catch {
+      toast.error('Failed to update billing mode');
+    } finally {
+      savingBillingMode = false;
+    }
   }
 
   // ── Invite ─────────────────────────────────────────────────────────────────
@@ -383,6 +425,7 @@
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Customer</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Contact</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Contract</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Billing</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Jobs</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Total Spent</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
@@ -434,6 +477,19 @@
                   {/if}
                 </td>
                 <td class="px-6 py-4">
+                  {#if (customer.billing_mode ?? 'card') === 'invoice'}
+                    <div class="flex items-center gap-1.5 text-amber-600">
+                      <FileText class="h-3.5 w-3.5" />
+                      <span class="text-xs font-medium">Invoice</span>
+                    </div>
+                  {:else}
+                    <div class="flex items-center gap-1.5 text-blue-600">
+                      <CreditCard class="h-3.5 w-3.5" />
+                      <span class="text-xs font-medium">Card</span>
+                    </div>
+                  {/if}
+                </td>
+                <td class="px-6 py-4">
                   <span class="text-sm text-gray-900">{customer.job_count || 0}</span>
                 </td>
                 <td class="px-6 py-4">
@@ -441,7 +497,6 @@
                 </td>
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-1">
-                    <!-- Invite button -->
                     {#if customer.email}
                       <button
                         onclick={(e) => sendInvite(customer, e)}
@@ -538,6 +593,70 @@
             <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center">
               <p class="text-2xl font-extrabold text-emerald-700">{formatCurrency(detailCustomer.total_spent ?? 0)}</p>
               <p class="text-xs text-gray-500 mt-0.5">Total Spent</p>
+            </div>
+          </div>
+
+          <!-- ── Billing Mode ── -->
+          <div class="overflow-hidden rounded-xl border border-gray-100">
+            <div class="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2.5">
+              <DollarSign class="h-4 w-4 text-gray-500" />
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Billing Mode</p>
+              <span class="ml-auto text-xs font-medium text-gray-400">Admin only</span>
+            </div>
+            <div class="p-4 space-y-3">
+              <p class="text-xs text-gray-500 leading-relaxed">
+                Invoice billing is for trusted commercial/HOA clients only. Residential customers default to card on file.
+              </p>
+              <div class="grid grid-cols-2 gap-2">
+                <!-- Card on file -->
+                <button
+                  onclick={() => toggleBillingMode('card')}
+                  disabled={savingBillingMode}
+                  class="flex flex-col items-start gap-1.5 rounded-xl border-2 p-3 text-left transition-all disabled:opacity-60
+                    {(detailCustomer.billing_mode ?? 'card') === 'card'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-gray-50 hover:border-blue-200'}"
+                >
+                  <div class="flex items-center gap-1.5">
+                    <CreditCard class="h-4 w-4 {(detailCustomer.billing_mode ?? 'card') === 'card' ? 'text-blue-600' : 'text-gray-400'}" />
+                    <span class="text-xs font-semibold {(detailCustomer.billing_mode ?? 'card') === 'card' ? 'text-blue-800' : 'text-gray-700'}">
+                      Card on File
+                    </span>
+                    {#if (detailCustomer.billing_mode ?? 'card') === 'card'}
+                      <div class="ml-auto h-2 w-2 rounded-full bg-blue-500"></div>
+                    {/if}
+                  </div>
+                  <p class="text-xs leading-snug {(detailCustomer.billing_mode ?? 'card') === 'card' ? 'text-blue-600' : 'text-gray-400'}">
+                    Charged after each service
+                  </p>
+                </button>
+
+                <!-- Invoice billing -->
+                <button
+                  onclick={() => toggleBillingMode('invoice')}
+                  disabled={savingBillingMode}
+                  class="flex flex-col items-start gap-1.5 rounded-xl border-2 p-3 text-left transition-all disabled:opacity-60
+                    {detailCustomer.billing_mode === 'invoice'
+                      ? 'border-amber-500 bg-amber-50'
+                      : 'border-gray-200 bg-gray-50 hover:border-amber-200'}"
+                >
+                  <div class="flex items-center gap-1.5">
+                    <FileText class="h-4 w-4 {detailCustomer.billing_mode === 'invoice' ? 'text-amber-600' : 'text-gray-400'}" />
+                    <span class="text-xs font-semibold {detailCustomer.billing_mode === 'invoice' ? 'text-amber-800' : 'text-gray-700'}">
+                      Invoice
+                    </span>
+                    {#if detailCustomer.billing_mode === 'invoice'}
+                      <div class="ml-auto h-2 w-2 rounded-full bg-amber-500"></div>
+                    {/if}
+                  </div>
+                  <p class="text-xs leading-snug {detailCustomer.billing_mode === 'invoice' ? 'text-amber-600' : 'text-gray-400'}">
+                    Net-15 invoice by email
+                  </p>
+                </button>
+              </div>
+              {#if savingBillingMode}
+                <p class="text-xs text-gray-400">Saving...</p>
+              {/if}
             </div>
           </div>
 

@@ -1,7 +1,6 @@
 <script lang="ts">
   // src/routes/(customer)/my/jobs/[id]/+page.svelte
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
   import { toast } from 'svelte-sonner';
   import Loader from 'lucide-svelte/icons/loader';
   import Calendar from 'lucide-svelte/icons/calendar';
@@ -45,14 +44,14 @@
   let lightboxPhoto  = $derived(lightboxPhotos[lightboxIndex] ?? null);
 
   onMount(async () => {
-    const urlToken = $page.url.searchParams.get('token');
+    const urlToken = new URLSearchParams(window.location.search).get('token');
     if (urlToken) localStorage.setItem('cruzcrewz_customer_token', urlToken);
     token = localStorage.getItem('cruzcrewz_customer_token') ?? '';
 
     if (!token) { window.location.href = '/my'; return; }
 
     try {
-      const res = await fetch(`/api/customer-portal?token=${token}&jobId=${$page.params.id}`);
+      const res = await fetch(`/api/customer-portal?token=${token}&jobId=${window.location.pathname.split('/').pop()}`);
       const data = await res.json();
       if (!res.ok || !data.job) {
         error = 'Job not found.';

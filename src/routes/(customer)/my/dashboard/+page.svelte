@@ -1,14 +1,19 @@
 <script lang="ts">
   // src/routes/(customer)/my/dashboard/+page.svelte
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { toast } from 'svelte-sonner';
+  import { supabase } from '$lib/supabase';
   import Loader from 'lucide-svelte/icons/loader';
   import Calendar from 'lucide-svelte/icons/calendar';
   import CheckCircle from 'lucide-svelte/icons/check-circle';
-  import Clock from 'lucide-svelte/icons/clock';
   import FileText from 'lucide-svelte/icons/file-text';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import LogOut from 'lucide-svelte/icons/log-out';
-  import AlertCircle from 'lucide-svelte/icons/alert-circle';
+  import ShieldCheck from 'lucide-svelte/icons/shield-check';
+  import ShieldAlert from 'lucide-svelte/icons/shield-alert';
+  import PenLine from 'lucide-svelte/icons/pen-line';
+  import ContractAgreement from '$lib/components/ContractAgreement.svelte';
 
   type Customer = {
     id: string;
@@ -16,6 +21,7 @@
     email: string;
     address: string | null;
     phone: string | null;
+    contract_signed: boolean;
   };
 
   type Job = {
@@ -36,20 +42,20 @@
   let error      = $state('');
   let token      = $state('');
 
+  // Contract signing
+  let showContract   = $state(false);
+  let contractData   = $state<any>(null);
+  let signingDone    = $state(false);
+
   onMount(async () => {
-    // Read token from URL or localStorage
-    const urlToken = new URLSearchParams(window.location.search).get('token');
+    const urlToken = $page.url.searchParams.get('token');
     if (urlToken) {
       localStorage.setItem('cruzcrewz_customer_token', urlToken);
-      // Clean URL
       window.history.replaceState({}, '', '/my/dashboard');
     }
     token = localStorage.getItem('cruzcrewz_customer_token') ?? '';
 
-    if (!token) {
-      window.location.href = '/my';
-      return;
-    }
+    if (!token) { window.location.href = '/my'; return; }
 
     try {
       const res = await fetch(`/api/customer-portal?token=${token}`);
@@ -61,6 +67,21 @@
       }
       customer = data.customer;
       jobs     = data.jobs ?? [];
+
+      // Prep contract data if not signed
+      if (customer && !customer.contract_signed) {
+        const latestJob = jobs[0];
+        contractData = {
+          customerId:    customer.id,
+          customerName:  customer.name,
+          customerEmail: customer.email,
+          customerPhone: customer.phone ?? '',
+          services:      latestJob ? [latestJob.service_type] : ['Lawn Care Services'],
+          schedule:      'As scheduled',
+          totalPrice:    latestJob?.price ?? 0,
+          jobId:         latestJob?.id ?? '',
+        };
+      }
     } catch {
       error = 'Failed to load your account. Please try signing in again.';
     } finally {
@@ -73,6 +94,24 @@
     window.location.href = '/my';
   }
 
+  async function handleContractComplete() {
+    showContract = false;
+    signingDone = true;
+    // Mark contract signed in DB
+    if (customer) {
+      await supabase
+        .from('customers')
+        .update({ contract_signed: true, contract_signed_at: new Date().toISOString() })
+        .eq('id', customer.id);
+      customer = { ...customer, contract_signed: true };
+    }
+    toast.success('Thank you — your service agreement is signed!');
+  }
+
+  function handleContractCancel() {
+    showContract = false;
+  }
+
   function formatDate(dateStr: string) {
     return new Date(dateStr.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'short', month: 'long', day: 'numeric', year: 'numeric'
@@ -83,12 +122,12 @@
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   }
 
-  const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
-    pending:     { label: 'Pending',     color: 'bg-gray-100 text-gray-600',    icon: 'clock' },
-    scheduled:   { label: 'Scheduled',   color: 'bg-blue-50 text-blue-700',     icon: 'calendar' },
-    in_progress: { label: 'In Progress', color: 'bg-yellow-50 text-yellow-700', icon: 'clock' },
-    completed:   { label: 'Completed',   color: 'bg-emerald-50 text-emerald-700', icon: 'check' },
-    cancelled:   { label: 'Cancelled',   color: 'bg-red-50 text-red-600',       icon: 'x' },
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    pending:     { label: 'Pending',     color: 'bg-gray-100 text-gray-600' },
+    scheduled:   { label: 'Scheduled',   color: 'bg-blue-50 text-blue-700' },
+    in_progress: { label: 'In Progress', color: 'bg-yellow-50 text-yellow-700' },
+    completed:   { label: 'Completed',   color: 'bg-emerald-50 text-emerald-700' },
+    cancelled:   { label: 'Cancelled',   color: 'bg-red-50 text-red-600' },
   };
 
   let upcomingJobs = $derived(
@@ -106,6 +145,8 @@
   let totalSpent = $derived(
     jobs.filter(j => j.status === 'completed' && j.price).reduce((sum, j) => sum + Number(j.price), 0)
   );
+
+  let needsContract = $derived(customer && !customer.contract_signed && !signingDone);
 </script>
 
 <svelte:head>
@@ -150,6 +191,38 @@
       </div>
 
     {:else if customer}
+
+      <!-- Contract gate banner -->
+      {#if needsContract}
+        <div class="rounded-2xl border-2 border-amber-300 bg-amber-50 p-5">
+          <div class="flex items-start gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+              <ShieldAlert class="h-5 w-5 text-amber-600" />
+            </div>
+            <div class="flex-1">
+              <p class="font-semibold text-amber-900">Service agreement required</p>
+              <p class="mt-1 text-sm text-amber-700">
+                Please sign your Cruz Crewz service agreement before your first service. It only takes 30 seconds.
+              </p>
+              <button
+                onclick={() => showContract = true}
+                class="mt-3 flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-700 transition-colors"
+              >
+                <PenLine class="h-4 w-4" />
+                Sign Service Agreement
+              </button>
+            </div>
+          </div>
+        </div>
+
+      {:else}
+        <!-- Signed confirmation -->
+        <div class="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+          <ShieldCheck class="h-4 w-4 text-emerald-600" />
+          <p class="text-sm font-medium text-emerald-800">Service agreement on file</p>
+        </div>
+      {/if}
+
       <!-- Welcome -->
       <div>
         <h1 class="text-xl font-bold text-gray-900">Welcome back, {customer.name.split(' ')[0]}</h1>
@@ -254,3 +327,12 @@
     {/if}
   </div>
 </div>
+
+<!-- Contract modal -->
+{#if showContract && contractData}
+  <ContractAgreement
+    {contractData}
+    onComplete={handleContractComplete}
+    onCancel={handleContractCancel}
+  />
+{/if}

@@ -35,7 +35,7 @@
   let jobs          = $state<Job[]>([]);
   let customers     = $state<{ id: string }[]>([]);
   let loading       = $state(true);
-  let digest        = $state('');
+  let digest        = $state<any>(null);
   let digestLoading = $state(false);
   let digestError   = $state('');
 
@@ -49,7 +49,7 @@
     loading = false;
 
     const cached = sessionStorage.getItem('cruzcrewz_digest');
-    if (cached) digest = cached;
+    if (cached) { try { digest = JSON.parse(cached); } catch { digest = null; } }
 
     const dismissedRaw = localStorage.getItem('cruzcrewz_churn_dismissed');
     if (dismissedRaw) churnDismissed = new Set(JSON.parse(dismissedRaw));
@@ -144,22 +144,19 @@
     digestLoading = true;
     digestError = '';
     try {
-      const summary = {
-        totalJobs: jobs.length,
-        completedRevenue,
-        upcomingCount: upcomingJobs.length,
-        needsReviewCount: needsReview.length,
-        customerCount: customers.length,
-      };
+      const now = new Date();
+      const weekStart = new Date();
+      weekStart.setDate(now.getDate() - now.getDay());
+      const weekJobs = jobs.filter(j => new Date(j.scheduled_date) >= weekStart);
       const res = await fetch('/api/generate-digest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summary }),
+        body: JSON.stringify({ weekJobs, allJobs: jobs, pendingQuotes: [], customers }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       digest = data.digest;
-      sessionStorage.setItem('cruzcrewz_digest', data.digest);
+      sessionStorage.setItem('cruzcrewz_digest', JSON.stringify(data.digest));
     } catch {
       digestError = 'Failed to generate digest.';
     } finally {
@@ -236,7 +233,41 @@
         <Sparkles class="h-4 w-4 text-purple-500" />
         <p class="text-xs font-semibold uppercase tracking-wide text-purple-500">AI Weekly Digest</p>
       </div>
-      <p class="text-sm text-gray-700 leading-relaxed">{digest}</p>
+      <p class="text-sm font-semibold text-gray-900">{digest.headline}</p>
+      <p class="text-sm text-gray-600 leading-relaxed">{digest.weekSummary}</p>
+      <div class="flex items-center gap-1 mt-1">
+        <span class="text-xs font-bold text-purple-600 bg-purple-100 rounded-full px-2 py-0.5">Score: {digest.weekScore}/10</span>
+      </div>
+      {#if digest.wins?.length}
+        <div class="mt-2 space-y-1">
+          {#each digest.wins as win}
+            <div class="flex items-center gap-2">
+              <div class="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
+              <p class="text-xs text-gray-700">{win}</p>
+            </div>
+          {/each}
+        </div>
+      {/if}
+      {#if digest.watchouts?.length}
+        <div class="mt-2 space-y-1">
+          {#each digest.watchouts as w}
+            <div class="flex items-center gap-2">
+              <div class="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
+              <p class="text-xs text-gray-700">{w}</p>
+            </div>
+          {/each}
+        </div>
+      {/if}
+      {#if digest.proactiveInsights?.length}
+        <div class="mt-2 space-y-2">
+          {#each digest.proactiveInsights as insight}
+            <div class="rounded-xl bg-white border border-purple-100 px-3 py-2">
+              <p class="text-xs font-semibold text-gray-900">{insight.title}</p>
+              <p class="text-xs text-gray-500 mt-0.5">{insight.body}</p>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/if}
 

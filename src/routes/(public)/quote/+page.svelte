@@ -1012,6 +1012,10 @@
         <!-- ══════════════════════════════════════════════════════════════════
              STEP 5 — Review & Preferences
         ══════════════════════════════════════════════════════════════════ -->
+        <!-- DROP-IN REPLACEMENT for the STEP 5 block in /quote/+page.svelte -->
+<!-- Replaces everything from {:else if currentStep === 5} through the closing {/if} of that block -->
+<!-- (before the Navigation section) -->
+
         {:else if currentStep === 5}
           <div class="space-y-6">
             <!-- Frequency -->
@@ -1043,6 +1047,39 @@
               <textarea id="notes" bind:value={formData.additionalNotes} rows="3"
                 class="block w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all resize-none"
                 placeholder="Gate codes, special instructions, or anything else we should know..."></textarea>
+            </div>
+
+            <!-- Payment method info card -->
+            <div class="overflow-hidden rounded-xl border border-blue-100 bg-blue-50">
+              <div class="flex items-center gap-3 border-b border-blue-100 bg-blue-600 px-4 py-3">
+                <svg class="h-4 w-4 shrink-0 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect width="20" height="14" x="2" y="5" rx="2"/>
+                  <path d="M2 10h20"/>
+                </svg>
+                <p class="text-xs font-semibold uppercase tracking-wide text-white">Payment Method</p>
+              </div>
+              <div class="p-4">
+                <div class="flex items-start gap-3">
+                  <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                    <svg class="h-4 w-4 text-blue-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect width="18" height="11" x="3" y="11" rx="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-sm font-semibold text-blue-900">Card on file — automatic billing</p>
+                    <p class="mt-1 text-xs leading-relaxed text-blue-700">
+                      Your card is saved securely and will only be charged after each service is reviewed and completed — never before. You'll receive an invoice by email after every visit.
+                    </p>
+                  </div>
+                </div>
+                <div class="mt-3 flex items-center gap-2 border-t border-blue-100 pt-3">
+                  <svg class="h-3.5 w-3.5 shrink-0 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                  </svg>
+                  <p class="text-xs text-blue-500">Secured by Stripe. Your card details are never stored on our servers.</p>
+                </div>
+              </div>
             </div>
 
             <!-- Summary -->

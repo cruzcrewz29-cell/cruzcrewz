@@ -45,13 +45,21 @@ export function invoiceTemplate(p: InvoiceParams): { html: string; text: string 
             <td style="padding:6px 0;font-size:0.85rem;color:#6b7280;">Date</td>
             <td style="padding:6px 0;font-size:0.85rem;color:#111;text-align:right;">${date}</td>
           </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:0.85rem;color:#6b7280;">Payment Terms</td>
+            <td style="padding:6px 0;font-size:0.85rem;color:#111;text-align:right;">Net-15</td>
+          </tr>
           <tr style="border-top:1px solid #e5e7eb;">
-            <td style="padding:12px 0 6px;font-size:1rem;font-weight:700;color:#111;">Total</td>
+            <td style="padding:12px 0 6px;font-size:1rem;font-weight:700;color:#111;">Total Due</td>
             <td style="padding:12px 0 6px;font-size:1rem;font-weight:700;color:#059669;text-align:right;">${amount}</td>
           </tr>
         </table>
       </div>
 
+      <div style="text-align:center;margin:20px 0;">
+        <a href="https://cruzcrewz.com/pay/${p.jobId}" style="display:inline-block;background:#059669;color:#ffffff;font-size:0.95rem;font-weight:700;padding:14px 36px;border-radius:10px;text-decoration:none;">Pay Now</a>
+        <p style="margin:8px 0 0;font-size:0.75rem;color:#9ca3af;">Payment due within 15 days of service</p>
+      </div>
       <p style="margin:0 0 8px;font-size:0.85rem;color:#6b7280;">Questions? Reply to this email or call us anytime.</p>
       <p style="margin:0;font-size:0.85rem;color:#6b7280;">Thank you for your business!</p>
     </div>
