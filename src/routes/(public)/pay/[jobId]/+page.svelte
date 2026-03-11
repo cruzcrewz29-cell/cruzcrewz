@@ -2,7 +2,7 @@
   // src/routes/(public)/pay/[jobId]/+page.svelte
   import { onMount } from 'svelte';
   import { loadStripe } from '@stripe/stripe-js';
-  import { PUBLIC_STRIPE_PUBLISHABLE_KEY } from '$env/static/public';
+  import { PUBLIC_STRIPE_KEY } from '$env/static/public';
   import { supabase } from '$lib/supabase';
 
   let { data } = $props<{ data: { jobId: string } }>();
@@ -55,7 +55,7 @@
 
     // Mount Stripe
     try {
-      stripe   = await loadStripe(PUBLIC_STRIPE_PUBLISHABLE_KEY);
+      stripe   = await loadStripe(PUBLIC_STRIPE_KEY);
       elements = stripe.elements();
       cardEl   = elements.create('card', {
         style: {
