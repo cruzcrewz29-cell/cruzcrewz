@@ -68,41 +68,29 @@
 
     <!-- 3. SMS / Text Messaging -->
     <section class="rounded-2xl border-2 border-green-100 bg-green-50 p-8">
-      <h2 class="text-xl font-bold text-gray-900 mb-4">3. SMS and Text Message Communications</h2>
-      <div class="space-y-4 text-gray-700 leading-relaxed">
+  <h2 class="text-xl font-bold text-gray-900 mb-4">3. SMS and Text Message Communications</h2>
+  <div class="space-y-4 text-gray-700 leading-relaxed">
+    <div>
+      <h3 class="font-semibold text-gray-900 mb-2">Customer Consent for SMS</h3>
+      <p>
+        Cruz Crewz LLC provides two distinct SMS programs. Consent for one does not automatically enroll you in the other:
+      </p>
+      <ul class="list-disc pl-6 mt-2 space-y-2">
+        <li><strong>Informational/Transactional:</strong> By opting in during the booking or contract process, you agree to receive messages regarding appointment reminders, service updates, and invoices.</li>
+        <li><strong>Marketing/Promotional:</strong> If you explicitly opt-in for marketing, you may receive promotional offers or seasonal discounts.</li>
+      </ul>
+      <p class="mt-2 text-sm italic">Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies.</p>
+    </div>
 
-        <div>
-          <h3 class="font-semibold text-gray-900 mb-2">Messaging Terms and Conditions</h3>
-          <p>
-            By providing your phone number and agreeing to receive texts, you consent to receive text messages 
-            from Cruz Crewz LLC from <strong>2193164822</strong> regarding informational and service-related communications 
-            including appointment reminders, service confirmations, and updates. Consent is not a condition of purchase. 
-            Message frequency varies. Message &amp; data rates may apply.
-          </p>
-        </div>
-
-        <div>
-          <h3 class="font-semibold text-gray-900 mb-2">How to Opt Out</h3>
-          <p>
-            You can reply <strong>STOP</strong> to any text message to unsubscribe at any time. 
-            Reply <strong>HELP</strong> for assistance. You can also contact us directly at 
-            <a href="tel:2193164822" class="text-green-700 hover:underline">219-316-4822</a> or 
-            <a href="mailto:cruzcrewzllc@yahoo.com" class="text-green-700 hover:underline">cruzcrewzllc@yahoo.com</a>.
-          </p>
-        </div>
-
-        <div>
-          <h3 class="font-semibold text-gray-900 mb-2">Data Sharing — SMS</h3>
-          <p>
-            Mobile opt-in data and consent are <strong>never shared with any third party for any purpose</strong>, 
-            including promotional or marketing purposes. Customer data is not shared with third parties for 
-            promotional or marketing purposes. Any information sharing that may be described elsewhere in this 
-            policy explicitly excludes mobile opt-in data and consent.
-          </p>
-        </div>
-
-      </div>
-    </section>
+    <div>
+      <h3 class="font-semibold text-gray-900 mb-2">Data Privacy & Sharing</h3>
+      <p>
+        <strong>No mobile information will be shared with third parties/affiliates for marketing/promotional purposes.</strong> 
+        All the above categories exclude text messaging originator opt-in data and consent; this information will not be shared with any third parties.
+      </p>
+    </div>
+  </div>
+</section>
 
     <!-- 4. Data Sharing -->
     <section>

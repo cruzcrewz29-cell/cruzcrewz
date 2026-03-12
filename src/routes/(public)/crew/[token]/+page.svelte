@@ -11,6 +11,8 @@
   import Upload from 'lucide-svelte/icons/upload';
   import X from 'lucide-svelte/icons/x';
   import ImageIcon from 'lucide-svelte/icons/image';
+  import * as m from '$lib/paraglide/messages';
+  import LanguageToggle from '$lib/components/LanguageToggle.svelte';
 
   const token = $page.params.token;
 
@@ -53,7 +55,7 @@
       .single();
 
     if (err || !data) {
-      error = 'Invalid tracker link.';
+      error = m.crew_invalid_link();
       loading = false;
       return;
     }
@@ -84,7 +86,7 @@
   }
 
   function startGPS() {
-    if (!navigator.geolocation) { gpsError = 'GPS not available on this device.'; return; }
+    if (!navigator.geolocation) { gpsError = m.crew_gps_unavailable(); return; }
     gpsActive = true;
     gpsError = '';
     watchId = navigator.geolocation.watchPosition(
@@ -97,7 +99,7 @@
         });
         lastPing = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       },
-      (err) => { gpsError = 'GPS error — location sharing paused.'; gpsActive = false; },
+      (err) => { gpsError = m.crew_gps_error(); gpsActive = false; },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
   }
@@ -155,7 +157,7 @@
       photos = updatedPhotos;
     } catch (err) {
       console.error('[uploadPhoto]', err);
-      photoError = 'Upload failed. Please try again.';
+      photoError = m.crew_upload_failed();
     } finally {
       if (type === 'before') uploadingBefore = false;
       else uploadingAfter = false;
@@ -184,7 +186,7 @@
 </script>
 
 <svelte:head>
-  <title>Cruz Crewz — Crew App</title>
+  <title>{m.crew_title()}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </svelte:head>
 
@@ -197,13 +199,17 @@
         <span class="text-sm font-bold text-white">CC</span>
       </div>
       <div>
-        <p class="text-sm font-semibold">Cruz Crewz</p>
-        <p class="text-xs text-gray-400">Crew Job App</p>
+        <p class="text-sm font-semibold">{m.brand_name()}</p>
+        <p class="text-xs text-gray-400">{m.brand_tagline_crew()}</p>
       </div>
       {#if gpsActive}
         <div class="ml-auto flex items-center gap-1.5 rounded-full bg-emerald-900 px-2.5 py-1">
           <div class="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></div>
-          <span class="text-xs font-medium text-emerald-400">GPS Live</span>
+          <span class="text-xs font-medium text-emerald-400">{m.crew_gps_live()}</span>
+        </div>
+      {:else}
+        <div class="ml-auto">
+          <LanguageToggle />
         </div>
       {/if}
     </div>
@@ -227,7 +233,7 @@
 
       <!-- Job card -->
       <div class="rounded-2xl border border-gray-700 bg-gray-800 p-5">
-        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Your Job</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{m.crew_your_job()}</p>
         <p class="mt-2 text-xl font-bold text-white">{customer?.name ?? 'Customer'}</p>
         <p class="mt-1 text-sm text-emerald-400">{job?.service_type ?? ''}</p>
         {#if customer?.address}
@@ -247,13 +253,13 @@
           class="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-700 bg-blue-900/40 py-3.5 text-sm font-semibold text-blue-300 hover:bg-blue-900/60 transition-colors"
         >
           <Navigation class="h-4 w-4" />
-          Navigate to Job
+          {m.crew_navigate()}
         </button>
       {/if}
 
       <!-- Status buttons -->
       <div class="space-y-3">
-        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Update Status</p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{m.crew_update_status()}</p>
 
         {#if tracker.status === 'pending' || tracker.status === 'on_the_way'}
           <button
@@ -265,7 +271,7 @@
                 : 'bg-blue-600 text-white hover:bg-blue-500'}"
           >
             {#if updating}<Loader class="h-4 w-4 animate-spin" />{/if}
-            {tracker.status === 'on_the_way' ? 'On the Way (active)' : 'On My Way'}
+            {tracker.status === 'on_the_way' ? m.crew_on_the_way_active() : m.crew_on_my_way()}
           </button>
         {/if}
 
@@ -279,7 +285,7 @@
                 : 'bg-emerald-600 text-white hover:bg-emerald-500'}"
           >
             {#if updating}<Loader class="h-4 w-4 animate-spin" />{/if}
-            {tracker.status === 'arrived' ? 'Arrived (active)' : "I've Arrived"}
+            {tracker.status === 'arrived' ? m.crew_arrived_active() : m.crew_arrived()}
           </button>
         {/if}
 
@@ -288,12 +294,12 @@
           <div class="rounded-2xl border border-gray-700 bg-gray-800 p-4 space-y-4">
             <div class="flex items-center gap-2">
               <Camera class="h-4 w-4 text-gray-400" />
-              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Job Photos</p>
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{m.crew_job_photos()}</p>
             </div>
 
             <!-- Before photos -->
             <div class="space-y-2">
-              <p class="text-xs font-medium text-gray-300">Before</p>
+              <p class="text-xs font-medium text-gray-300">{m.crew_before()}</p>
               {#if beforePhotos.length > 0}
                 <div class="grid grid-cols-3 gap-2">
                   {#each beforePhotos as photo}
@@ -313,10 +319,10 @@
                 <label class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-600 py-3 text-sm font-medium text-gray-400 hover:border-gray-400 hover:text-gray-300 transition-colors">
                   {#if uploadingBefore}
                     <Loader class="h-4 w-4 animate-spin" />
-                    Uploading...
+                    {m.crew_uploading()}
                   {:else}
                     <Upload class="h-4 w-4" />
-                    Add Before Photo
+                    {m.crew_add_before_photo()}
                   {/if}
                   <input
                     type="file"
@@ -332,7 +338,7 @@
 
             <!-- After photos -->
             <div class="space-y-2">
-              <p class="text-xs font-medium text-gray-300">After</p>
+              <p class="text-xs font-medium text-gray-300">{m.crew_after()}</p>
               {#if afterPhotos.length > 0}
                 <div class="grid grid-cols-3 gap-2">
                   {#each afterPhotos as photo}
@@ -352,10 +358,10 @@
                 <label class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-600 py-3 text-sm font-medium text-gray-400 hover:border-gray-400 hover:text-gray-300 transition-colors">
                   {#if uploadingAfter}
                     <Loader class="h-4 w-4 animate-spin" />
-                    Uploading...
+                    {m.crew_uploading()}
                   {:else}
                     <Upload class="h-4 w-4" />
-                    Add After Photo
+                    {m.crew_add_after_photo()}
                   {/if}
                   <input
                     type="file"
@@ -382,17 +388,21 @@
             class="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-100 py-4 text-base font-bold text-gray-900 hover:bg-white transition-colors"
           >
             {#if updating}<Loader class="h-4 w-4 animate-spin text-gray-700" />{/if}
-            Mark Job Complete
+            {m.crew_mark_complete()}
           </button>
         {/if}
 
         {#if tracker.status === 'completed'}
           <div class="flex flex-col items-center rounded-xl border border-emerald-700 bg-emerald-900/20 py-8 text-center">
             <CheckCircle class="h-10 w-10 text-emerald-400" />
-            <p class="mt-2 text-lg font-bold text-emerald-400">Job Complete!</p>
-            <p class="mt-1 text-xs text-gray-400">Great work. The customer has been notified.</p>
+            <p class="mt-2 text-lg font-bold text-emerald-400">{m.crew_job_complete()}</p>
+            <p class="mt-1 text-xs text-gray-400">{m.crew_job_complete_sub()}</p>
             {#if photos.length > 0}
-              <p class="mt-1 text-xs text-gray-400">{photos.length} photo{photos.length !== 1 ? 's' : ''} uploaded.</p>
+              <p class="mt-1 text-xs text-gray-400">
+                {photos.length !== 1
+                  ? m.crew_photos_uploaded_plural({ n: photos.length })
+                  : m.crew_photos_uploaded({ n: photos.length })}
+              </p>
             {/if}
           </div>
         {/if}
@@ -403,12 +413,12 @@
         <div class="rounded-xl border border-emerald-800 bg-emerald-900/20 px-4 py-3">
           <div class="flex items-center gap-2">
             <div class="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></div>
-            <p class="text-xs font-medium text-emerald-400">Sharing live location with customer</p>
+            <p class="text-xs font-medium text-emerald-400">{m.crew_sharing_location()}</p>
           </div>
           {#if lastPing}
-            <p class="mt-1 text-xs text-gray-500">Last update: {lastPing}</p>
+            <p class="mt-1 text-xs text-gray-500">{m.crew_last_update({ time: lastPing })}</p>
           {/if}
-          <button onclick={stopGPS} class="mt-2 text-xs text-gray-500 underline">Stop sharing</button>
+          <button onclick={stopGPS} class="mt-2 text-xs text-gray-500 underline">{m.crew_stop_sharing()}</button>
         </div>
       {/if}
 
@@ -421,7 +431,7 @@
       <!-- Customer phone -->
       {#if customer?.phone}
         <div class="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3">
-          <p class="text-xs text-gray-400">Customer contact</p>
+          <p class="text-xs text-gray-400">{m.crew_customer_contact()}</p>
           <a href="tel:{customer.phone}" class="mt-0.5 block text-sm font-medium text-blue-400">{customer.phone}</a>
         </div>
       {/if}

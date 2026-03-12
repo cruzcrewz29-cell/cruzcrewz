@@ -191,13 +191,31 @@
     </section>
 
     <!-- 11. Contact -->
-    <section class="rounded-2xl bg-gray-50 border border-gray-100 p-8">
-      <h2 class="text-xl font-bold text-gray-900 mb-4">11. Contact Us</h2>
-      <div class="space-y-2 text-gray-600">
-        <p class="font-semibold text-gray-900">Cruz Crewz LLC</p>
-        <p>Email: <a href="mailto:cruzcrewzllc@yahoo.com" class="text-green-700 hover:underline">cruzcrewzllc@yahoo.com</a></p>
-        <p>Phone: <a href="tel:2193164822" class="text-green-700 hover:underline">219-316-4822</a></p>
-        <p>Website: <a href="https://cruzcrewz.com" class="text-green-700 hover:underline">cruzcrewz.com</a></p>
+   <section>
+      <h2 class="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">11. SMS/Text Messaging</h2>
+      <div class="space-y-4 text-gray-600 leading-relaxed">
+        <p>
+          By opting in to receive SMS messages from Cruz Crewz LLC, you agree to receive recurring 
+          informational and/or marketing text messages. Consent is not a condition of purchase. 
+          Message frequency varies. Message and data rates may apply.
+        </p>
+        <div class="bg-gray-50 rounded-xl p-5 space-y-3 border border-gray-100">
+          <p>
+            <strong class="text-gray-800">To Stop:</strong> You can cancel the SMS service at any time. 
+            Just text <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200 text-green-700">STOP</span> to our number. 
+            After you send "STOP," we will send you a confirmation message. You will no longer receive 
+            SMS messages from us thereafter unless you opt back in.
+          </p>
+          <p>
+            <strong class="text-gray-800">To Get Help:</strong> If you are experiencing issues, reply with the keyword 
+            <span class="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200 text-green-700">HELP</span> 
+            for assistance, or email us at 
+            <a href="mailto:cruzcrewzllc@yahoo.com" class="text-green-700 hover:underline">cruzcrewzllc@yahoo.com</a>.
+          </p>
+          <p class="text-xs text-gray-500 italic">
+            Carriers are not liable for delayed or undelivered messages.
+          </p>
+        </div>
       </div>
     </section>
 

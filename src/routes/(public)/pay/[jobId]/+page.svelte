@@ -3,16 +3,25 @@
   import { onMount } from 'svelte';
   import { loadStripe } from '@stripe/stripe-js';
   import { PUBLIC_STRIPE_KEY } from '$env/static/public';
-  import { supabase } from '$lib/supabase';
 
-  let { data } = $props<{ data: { jobId: string } }>();
+  // Data fully loaded server-side — no client Supabase needed
+  let { data } = $props<{
+    data: {
+      job: {
+        id: string;
+        service_type: string;
+        price: number | null;
+        status: string;
+        scheduled_date: string;
+        invoice_number: string | null;
+        customers: { id: string; name: string; email: string | null; address: string | null } | null;
+      };
+      alreadyPaid: boolean;
+    }
+  }>();
 
-  // ── State ────────────────────────────────────────────────────────────────
-  let job        = $state<any>(null);
-  let customer   = $state<any>(null);
-  let loading    = $state(true);
-  let notFound   = $state(false);
-  let alreadyPaid = $state(false);
+  let job      = $derived(data.job);
+  let customer = $derived(data.job?.customers);
 
   // Stripe
   let stripe:     any = null;
@@ -24,36 +33,7 @@
   let paid        = $state(false);
 
   onMount(async () => {
-    // Load job + customer
-    const { data: jobData, error } = await supabase
-      .from('jobs')
-      .select(`
-        id, service_type, price, status, scheduled_date,
-        invoice_number, invoice_sent_at,
-        customers ( id, name, email, address )
-      `)
-      .eq('id', data.jobId)
-      .single();
-
-    if (error || !jobData) {
-      notFound = true;
-      loading  = false;
-      return;
-    }
-
-    job      = jobData;
-    customer = jobData.customers;
-
-    // Check if already paid (status = completed and we mark invoice paid via a column, or just status check)
-    if (jobData.status === 'paid') {
-      alreadyPaid = true;
-      loading     = false;
-      return;
-    }
-
-    loading = false;
-
-    // Mount Stripe
+    if (data.alreadyPaid) return;
     try {
       stripe   = await loadStripe(PUBLIC_STRIPE_KEY);
       elements = stripe.elements();
@@ -97,13 +77,13 @@
         return;
       }
 
-      if (paymentIntent.status === 'succeeded') {
-        // Mark job as paid
-        await supabase
-          .from('jobs')
-          .update({ status: 'paid', paid_at: new Date().toISOString() })
-          .eq('id', job.id);
-
+      if (paymentIntent?.status === 'succeeded') {
+        // Mark job paid via API (server-side, avoids RLS)
+        await fetch('/api/mark-job-paid', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: job.id }),
+        });
         paid = true;
       }
     } catch (e: any) {
@@ -139,23 +119,7 @@
       </div>
     </div>
 
-    {#if loading}
-      <div class="flex h-48 items-center justify-center">
-        <div class="h-8 w-8 animate-spin rounded-full border-4 border-green-600 border-t-transparent"></div>
-      </div>
-
-    {:else if notFound}
-      <div class="overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-100">
-        <div class="bg-gradient-to-br from-red-500 to-red-400 px-6 py-8 text-center text-white">
-          <h1 class="text-2xl font-bold">Invoice Not Found</h1>
-          <p class="mt-2 text-red-100">This payment link may have expired or be incorrect.</p>
-        </div>
-        <div class="p-6 text-center">
-          <p class="text-sm text-gray-500">Please contact Cruz Crewz for assistance.</p>
-        </div>
-      </div>
-
-    {:else if alreadyPaid || paid}
+    {#if data.alreadyPaid || paid}
       <div class="overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-100">
         <div class="bg-gradient-to-br from-green-700 to-green-500 px-6 py-8 text-center text-white">
           <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
@@ -164,13 +128,15 @@
             </svg>
           </div>
           <h1 class="text-2xl font-bold">Payment Received</h1>
-          <p class="mt-2 text-green-100">Thank you{customer?.name ? `, ${customer.name.split(' ')[0]}` : ''}! Your invoice has been paid.</p>
+          <p class="mt-2 text-green-100">
+            Thank you{customer?.name ? `, ${customer.name.split(' ')[0]}` : ''}! Your invoice has been paid.
+          </p>
         </div>
-        <div class="p-6 space-y-4 text-center">
+        <div class="p-6 text-center space-y-2">
           {#if job?.invoice_number}
             <p class="text-sm text-gray-500">Invoice {job.invoice_number}</p>
           {/if}
-          <p class="text-sm text-gray-600">A receipt has been sent to your email. Thank you for your business!</p>
+          <p class="text-sm text-gray-600">Thank you for your business!</p>
         </div>
       </div>
 
@@ -181,11 +147,7 @@
         <div class="bg-gradient-to-br from-green-700 via-green-600 to-green-500 px-6 py-6 text-white">
           <p class="text-xs font-semibold uppercase tracking-widest text-green-200">Invoice</p>
           <h1 class="mt-1 text-2xl font-bold">
-            {#if job.invoice_number}
-              {job.invoice_number}
-            {:else}
-              Pay Invoice
-            {/if}
+            {job.invoice_number ?? 'Pay Invoice'}
           </h1>
           {#if customer?.name}
             <p class="mt-0.5 text-sm text-green-100">{customer.name}</p>
@@ -222,13 +184,13 @@
             </div>
           </div>
 
-          <!-- Payment terms notice -->
+          <!-- Net-15 notice -->
           <div class="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
             <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             <p class="text-xs leading-relaxed text-amber-700">
-              Payment terms: <strong>Net-15.</strong> Payment is due within 15 days of the service date. Late payments may incur a fee.
+              Payment terms: <strong>Net-15.</strong> Payment is due within 15 days of the service date.
             </p>
           </div>
 
@@ -252,7 +214,6 @@
             </div>
           {/if}
 
-          <!-- Pay button -->
           <button
             onclick={handlePay}
             disabled={!stripeReady || processing}
@@ -261,7 +222,6 @@
             {processing ? 'Processing...' : `Pay $${Number(job.price ?? 0).toFixed(2)}`}
           </button>
 
-          <!-- Trust signals -->
           <p class="flex items-center justify-center gap-1.5 text-xs text-gray-400">
             <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
